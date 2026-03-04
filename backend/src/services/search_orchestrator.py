@@ -8,7 +8,7 @@ from src.services.llm_service import groq_llm_service
 logger = logging.getLogger(__name__)
 
 class SearchOrchestrator:
-    async def stream_search(self, query: str, focus_mode: str = "all") -> AsyncGenerator[str, None]:
+    async def stream_search(self, query: str, focus_mode: str = "all", messages: list = None) -> AsyncGenerator[str, None]:
         """
         Orchestrates the search:
         1. Fetch search results
@@ -24,7 +24,7 @@ class SearchOrchestrator:
             logger.info(f"Orchestrating search for: {query} with focus: {focus_mode}")
             
             # 1. Fetch search results
-            search_results = await tavily_search_service.search(query, max_results=5)
+            search_results = await tavily_search_service.search(query, max_results=12)
             
             # Format sources for frontend: must be {url, title, domain, snippet, citationIndex}
             frontend_sources = []
@@ -45,8 +45,9 @@ class SearchOrchestrator:
             yield f"data: {json.dumps(sources_event)}\n\n"
             
             # 3. Stream LLM Answer
-            # Instead of a single "token" event with the whole text, we stream it chunk by chunk
-            async for chunk in groq_llm_service.stream_answer(query, search_results):
+            # Instead of a single "token" event with the whole text, we stream it chunk by chunk.
+            # We slice search_results to top 5 to avoid aggressively hitting Groq's 6000 TPM limit.
+            async for chunk in groq_llm_service.stream_answer(query, search_results[:5], messages):
                 token_event = {
                     "type": "token",
                     "content": chunk

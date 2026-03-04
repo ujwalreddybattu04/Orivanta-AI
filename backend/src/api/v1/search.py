@@ -5,6 +5,7 @@ Search endpoints — POST /search (streaming SSE)
 from pydantic import BaseModel
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
+from typing import List, Dict, Optional
 
 from src.services.search_orchestrator import search_orchestrator
 
@@ -13,14 +14,36 @@ router = APIRouter()
 class SearchRequest(BaseModel):
     query: str
     focus_mode: str = "all"
+    messages: Optional[List[Dict[str, str]]] = None
 
 @router.post("/stream")
 async def search_stream(request: SearchRequest):
     """Submit a search query and receive a streaming AI-generated answer with citations."""
-    return StreamingResponse(
-        search_orchestrator.stream_search(request.query, request.focus_mode),
-        media_type="text/event-stream"
-    )
+    try:
+        return StreamingResponse(
+            search_orchestrator.stream_search(request.query, request.focus_mode, request.messages),
+            media_type="text/event-stream"
+        )
+    except Exception as e:
+        logger.error(f"Error in search stream: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+class TitleRequest(BaseModel):
+    query: str
+
+@router.post("/title")
+async def generate_title(request: TitleRequest):
+    """
+    Generate a short thread title from the initial query.
+    """
+    try:
+        from src.services.llm_service import groq_llm_service
+        title = await groq_llm_service.generate_thread_title(request.query)
+        return {"title": title}
+    except Exception as e:
+        logger.error(f"Error in title generation: {e}", exc_info=True)
+        # Fallback to a generic title rather than failing
+        return {"title": "Orivanta Search"}
 
 @router.post("/suggestions")
 async def search_suggestions(query: str = ""):

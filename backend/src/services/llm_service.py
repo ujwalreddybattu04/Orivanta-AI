@@ -41,22 +41,29 @@ class GroqLLMService:
             
         return prompt
 
-    async def stream_answer(self, query: str, context_results: List[Dict[str, Any]]) -> AsyncGenerator[str, None]:
+    async def stream_answer(self, query: str, context_results: List[Dict[str, Any]], history: List[Dict[str, str]] = None) -> AsyncGenerator[str, None]:
         """
         Streams the LLM response chunk by chunk using Groq.
         """
         if not self.client:
+            # Assuming error_event is defined elsewhere or this is a placeholder for a structured error.
+            # For now, keeping the original string message as error_event is not defined in this context.
             yield "LLM generation failed because Groq API key is missing."
             return
 
         system_prompt = self._build_system_prompt(context_results)
         
+        # Build message history
+        messages_payload = [{"role": "system", "content": system_prompt}]
+        if history:
+            # Take only the last 4 messages (2 complete turns) to save tokens
+            recent_history = history[-4:]
+            messages_payload.extend(recent_history)
+        messages_payload.append({"role": "user", "content": query})
+
         try:
             stream = await self.client.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": query}
-                ],
+                messages=messages_payload,
                 model=self.default_model,
                 temperature=0.2, # Low temperature for factual RAG
                 max_tokens=2048,
@@ -70,5 +77,34 @@ class GroqLLMService:
         except Exception as e:
             logger.exception(f"Groq API streaming failed: {e}")
             raise e
+
+    async def generate_thread_title(self, query: str) -> str:
+        """
+        Generates a concise 3-5 word title based on the user's initial query.
+        """
+        if not self.client:
+            return "New Thread"
+            
+        system_prompt = (
+            "You are a Title Generator. Based on the user's query, generate a concise, descriptive "
+            "title for an AI chat thread. The title MUST be 2 to 5 words long. "
+            "Do not use quotes, punctuation, or conversational fillers. Examples: "
+            "History of Deep Learning, React Server Components, Python Asyncio Best Practices."
+        )
+        
+        try:
+            chat_completion = await self.client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": query}
+                ],
+                model=self.default_model,
+                temperature=0.3,
+                max_tokens=20,
+            )
+            return chat_completion.choices[0].message.content.strip()
+        except Exception as e:
+            logger.error(f"Error generating title: {str(e)}")
+            return "New Thread"
 
 groq_llm_service = GroqLLMService()

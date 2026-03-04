@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 const NAV_ITEMS = [
     {
@@ -49,8 +49,33 @@ const NAV_ITEMS = [
 
 export default function Sidebar() {
     const pathname = usePathname();
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const activeThreadId = searchParams.get("id");
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [isMobileOpen, setIsMobileOpen] = useState(false);
+    const [threads, setThreads] = useState<any[]>([]);
+    const [searchQuery, setSearchQuery] = useState("");
+
+    // Read threads from local storage
+    const loadThreads = () => {
+        if (typeof window !== "undefined") {
+            try {
+                const threadsJson = localStorage.getItem("orivanta_threads");
+                if (threadsJson) {
+                    setThreads(JSON.parse(threadsJson));
+                }
+            } catch (e) {
+                console.error("Failed to load threads", e);
+            }
+        }
+    };
+
+    useEffect(() => {
+        loadThreads();
+        window.addEventListener("orivanta_threads_updated", loadThreads);
+        return () => window.removeEventListener("orivanta_threads_updated", loadThreads);
+    }, []);
 
     // Inject variable dynamically for the main-content smooth transition
     useEffect(() => {
@@ -64,6 +89,12 @@ export default function Sidebar() {
     useEffect(() => {
         setIsMobileOpen(false);
     }, [pathname]);
+
+    // Filter threads
+    const filteredThreads = threads.filter(t => {
+        const s = searchQuery.toLowerCase();
+        return (t.title || "").toLowerCase().includes(s) || (t.query || "").toLowerCase().includes(s);
+    });
 
     return (
         <>
@@ -119,12 +150,12 @@ export default function Sidebar() {
                 <div className="sidebar-divider" />
 
                 {/* New Thread */}
-                <button className="sidebar-new-thread" id="new-thread-btn" title={isCollapsed ? "New Thread" : undefined}>
+                <Link href="/" className="sidebar-new-thread" id="new-thread-btn" title={isCollapsed ? "New Thread" : undefined}>
                     <span className="sidebar-new-thread-icon">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="5" y2="19" /><line x1="5" x2="19" y1="12" y2="12" /></svg>
                     </span>
                     <span className="sidebar-link-label">New Thread</span>
-                </button>
+                </Link>
 
                 {/* Memory Ledger Section */}
                 <div className="sidebar-divider" />
@@ -133,7 +164,13 @@ export default function Sidebar() {
 
                     <div className="memory-search">
                         <svg className="memory-search-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
-                        <input type="text" placeholder="Search threads..." className="memory-search-input" />
+                        <input
+                            type="text"
+                            placeholder="Search threads..."
+                            className="memory-search-input"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
                     </div>
 
                     <div className="memory-filters">
@@ -143,11 +180,21 @@ export default function Sidebar() {
                     </div>
 
                     <div className="memory-list">
-                        <button className="memory-item">Perplexity AI Architect...</button>
-                        <button className="memory-item">React Server Compon...</button>
-                        <button className="memory-item">Glassmorphism CSS e...</button>
-                        <button className="memory-item">Python Asyncio best p...</button>
-                        <button className="memory-item">Supabase vs Firebase...</button>
+                        {filteredThreads.length === 0 ? (
+                            <div style={{ padding: "0 12px", color: "var(--text-muted)", fontSize: "12px" }}>
+                                No threads found.
+                            </div>
+                        ) : (
+                            filteredThreads.map((thread) => (
+                                <Link
+                                    key={thread.id}
+                                    href={`/search?q=${encodeURIComponent(thread.query)}&id=${thread.id}`}
+                                    className={`memory-item ${thread.id === activeThreadId ? 'active' : ''}`}
+                                >
+                                    {thread.title || thread.query}
+                                </Link>
+                            ))
+                        )}
                     </div>
                 </div>
 

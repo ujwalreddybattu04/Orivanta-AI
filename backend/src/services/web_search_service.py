@@ -15,7 +15,7 @@ class TavilySearchService:
         else:
             self.client = AsyncTavilyClient(api_key=self.api_key)
 
-    async def search(self, query: str, max_results: int = 5) -> List[Dict[str, Any]]:
+    async def search(self, query: str, max_results: int = 12) -> List[Dict[str, Any]]:
         """
         Perform a web search using the Tavily API.
         Returns a list of dictionaries with 'title', 'url', 'content', 'snippet', etc.

@@ -12,12 +12,15 @@ function SearchPageContent() {
     const router = useRouter();
     const query = searchParams.get("q") || "";
     const focusMode = searchParams.get("focus") || "all";
+    const threadId = searchParams.get("id") || undefined;
     const [followUp, setFollowUp] = useState("");
     const [activeTab, setActiveTab] = useState<"answer" | "links" | "images">("answer");
     const [sourcesPanelOpen, setSourcesPanelOpen] = useState(true);
     const [copied, setCopied] = useState(false);
 
     const {
+        history,
+        query: currentQuery,
         answer,
         sources,
         images,
@@ -26,19 +29,20 @@ function SearchPageContent() {
         isConnecting,
         error,
         model,
-    } = useSearch(query, focusMode);
+        appendQuery
+    } = useSearch(query, focusMode, threadId);
 
     const handleFollowUp = useCallback((e: React.FormEvent) => {
         e.preventDefault();
         const queryText = followUp.trim();
         if (!queryText || isConnecting || isStreaming) return;
         setFollowUp("");
-        router.push(`/search?q=${encodeURIComponent(queryText)}&focus=${focusMode}`);
-    }, [followUp, focusMode, router, isConnecting, isStreaming]);
+        appendQuery(queryText);
+    }, [followUp, appendQuery, isConnecting, isStreaming]);
 
     const handleRelatedSelect = useCallback((q: string) => {
-        router.push(`/search?q=${encodeURIComponent(q)}&focus=${focusMode}`);
-    }, [focusMode, router]);
+        appendQuery(q);
+    }, [appendQuery]);
 
     const handleCopy = useCallback(() => {
         navigator.clipboard.writeText(answer);
@@ -112,9 +116,30 @@ function SearchPageContent() {
                             {/* === ANSWER TAB === */}
                             {activeTab === "answer" && (
                                 <>
-                                    {/* Query heading — Perplexity only shows this in the Answer tab */}
+                                    {/* History map */}
+                                    {history && history.map((turn, idx) => (
+                                        <div key={idx} className="sp-thread-turn">
+                                            <div className="sp-query-row">
+                                                <div className="sp-query-bubble">{turn.query}</div>
+                                            </div>
+                                            <div className="sp-answer-body">
+                                                <AnswerStream
+                                                    content={turn.answer}
+                                                    isStreaming={false}
+                                                    sources={turn.sources}
+                                                    onCopy={() => {
+                                                        navigator.clipboard.writeText(turn.answer);
+                                                        setCopied(true);
+                                                        setTimeout(() => setCopied(false), 2000);
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    {/* Current Turn Query */}
                                     <div className="sp-query-row">
-                                        <div className="sp-query-bubble">{query}</div>
+                                        <div className="sp-query-bubble">{currentQuery}</div>
                                     </div>
 
                                     {isLoading && <AnswerSkeleton />}
@@ -277,35 +302,37 @@ function SearchPageContent() {
                     </div>
 
                     {/* Sticky Input Bar — at bottom of main column */}
-                    <div className="sp-input-bar">
-                        <form className="sp-input-form" onSubmit={handleFollowUp}>
-                            <button type="button" className="sp-input-attach" aria-label="Attach">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
-                            </button>
-                            <input
-                                type="text"
-                                className="sp-input-field"
-                                placeholder="Ask a follow-up"
-                                value={followUp}
-                                onChange={e => setFollowUp(e.target.value)}
-                                autoComplete="off"
-                                autoCorrect="off"
-                                spellCheck={false}
-                                id="follow-up-input"
-                            />
-                            <div className="sp-input-actions">
-                                <button type="button" className="sp-model-btn" aria-label="Select model">
-                                    Model <span className="sp-model-arrow">▾</span>
+                    {activeTab === "answer" && (
+                        <div className="sp-input-bar">
+                            <form className="sp-input-form" onSubmit={handleFollowUp}>
+                                <button type="button" className="sp-input-attach" aria-label="Attach">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
                                 </button>
-                                <button type="button" className="sp-voice-btn" aria-label="Voice input">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" x2="12" y1="19" y2="22" /></svg>
-                                </button>
-                                <button type="submit" className="sp-submit-btn" disabled={!followUp.trim() || isConnecting || isStreaming} aria-label="Send">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z" /></svg>
-                                </button>
-                            </div>
-                        </form>
-                    </div>
+                                <input
+                                    type="text"
+                                    className="sp-input-field"
+                                    placeholder="Ask a follow-up"
+                                    value={followUp}
+                                    onChange={e => setFollowUp(e.target.value)}
+                                    autoComplete="off"
+                                    autoCorrect="off"
+                                    spellCheck={false}
+                                    id="follow-up-input"
+                                />
+                                <div className="sp-input-actions">
+                                    <button type="button" className="sp-model-btn" aria-label="Select model">
+                                        Model <span className="sp-model-arrow">▾</span>
+                                    </button>
+                                    <button type="button" className="sp-voice-btn" aria-label="Voice input">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" x2="12" y1="19" y2="22" /></svg>
+                                    </button>
+                                    <button type="submit" className="sp-submit-btn" disabled={!followUp.trim() || isConnecting || isStreaming} aria-label="Send">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z" /></svg>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
                 </div>
 
                 {/* ─── Right Sources Panel — Always rendered to allow smooth CSS transitions ─── */}
