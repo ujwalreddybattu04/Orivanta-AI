@@ -51,6 +51,10 @@ class TavilySearchService:
             return results
         except Exception as e:
             logger.exception(f"Tavily search failed: {e}")
+            error_msg = str(e).lower()
+            if "usage limit" in error_msg or "429" in error_msg or "exceeds your plan" in error_msg:
+                # Re-raise so orchestrator can inform the user
+                raise Exception("Tavily API usage limit reached. Please check your search provider plan.") from e
             return []
 
 tavily_search_service = TavilySearchService()

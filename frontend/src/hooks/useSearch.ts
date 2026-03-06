@@ -8,6 +8,7 @@ export interface SearchSource {
     url: string;
     title: string;
     domain: string;
+    favicon?: string;
     faviconUrl?: string;
     snippet?: string;
     citationIndex: number;
@@ -46,6 +47,11 @@ function generateThreadId() {
     });
 }
 
+export interface ResearchStep {
+    type: 'thought' | 'query_step' | 'status';
+    content: string;
+}
+
 export interface SearchState {
     threadId: string | null;
     history: SearchMessage[];
@@ -53,12 +59,14 @@ export interface SearchState {
     answer: string;
     sources: SearchSource[];
     images: SearchImage[];
+    researchSteps: ResearchStep[];
     relatedQuestions: string[];
     isStreaming: boolean;
     isConnecting: boolean;
     error: string | null;
     model: string;
     tokensUsed: number;
+    thoughtTime: number; // Added to capture exact backend calculation
 }
 
 export function useSearch(initialQuery: string, focusMode: string = "all", existingThreadId?: string) {
@@ -69,16 +77,19 @@ export function useSearch(initialQuery: string, focusMode: string = "all", exist
         answer: "",
         sources: [],
         images: [],
+        researchSteps: [],
         relatedQuestions: [],
         isStreaming: false,
         isConnecting: true,
         error: null,
         model: "Auto",
         tokensUsed: 0,
+        thoughtTime: 0,
     });
 
     const abortRef = useRef<AbortController | null>(null);
     const hasStarted = useRef(false);
+    const lastProcessedQuery = useRef<string | null>(null);
     const threadIdRef = useRef<string | null>(existingThreadId || null);
 
     const runSearch = useCallback(async (q: string, focus: string, backendMessages?: any[], keepHistory?: SearchMessage[]) => {
@@ -95,6 +106,7 @@ export function useSearch(initialQuery: string, focusMode: string = "all", exist
             answer: "",
             sources: [],
             images: [],
+            researchSteps: [],
             relatedQuestions: [],
             isStreaming: true,
             isConnecting: true,
@@ -106,9 +118,6 @@ export function useSearch(initialQuery: string, focusMode: string = "all", exist
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    ...(typeof window !== "undefined" && localStorage.getItem("orivanta_access_token")
-                        ? { Authorization: `Bearer ${localStorage.getItem("orivanta_access_token")}` }
-                        : {}),
                 },
                 body: JSON.stringify({ query: q, focus_mode: focus, messages: backendMessages || [] }),
                 signal: abortRef.current.signal,
@@ -128,22 +137,35 @@ export function useSearch(initialQuery: string, focusMode: string = "all", exist
                 const { done, value } = await reader.read();
                 if (done) break;
 
-                buffer += decoder.decode(value, { stream: true });
+                const chunk = decoder.decode(value, { stream: true });
+                if (chunk.includes('"type": "sources"')) {
+                    console.log("[useSearch] RAW SOURCE CHUNK DETECTED:", chunk);
+                }
+                buffer += chunk;
                 const lines = buffer.split("\n");
                 buffer = lines.pop() || "";
 
                 for (const line of lines) {
                     const trimmed = line.trim();
                     if (!trimmed || trimmed === "data: [DONE]") continue;
-                    if (!trimmed.startsWith("data: ")) continue;
+
+                    // Support both "data: {...}" and "data:{...}"
+                    if (!trimmed.startsWith("data:")) continue;
 
                     try {
-                        const json = JSON.parse(trimmed.slice(6));
+                        const jsonPayload = trimmed.startsWith("data: ") ? trimmed.slice(6) : trimmed.slice(5);
+                        const json = JSON.parse(jsonPayload);
 
                         if (json.type === "token") {
                             setState(prev => ({ ...prev, answer: prev.answer + (json.content || "") }));
                         } else if (json.type === "sources") {
-                            setState(prev => ({ ...prev, sources: json.sources || [] }));
+                            // Support multiple possible keys for robustness
+                            const sourcesList = json.sources || json.items || json.results || [];
+                            console.log(`[useSearch] SOURCES ARRIVED! Count: ${sourcesList.length}`);
+                            if (sourcesList.length > 0) {
+                                console.log("[useSearch] First source sample:", sourcesList[0]);
+                            }
+                            setState(prev => ({ ...prev, sources: sourcesList }));
                         } else if (json.type === "images") {
                             setState(prev => ({ ...prev, images: json.images || [] }));
                         } else if (json.type === "related") {
@@ -154,11 +176,18 @@ export function useSearch(initialQuery: string, focusMode: string = "all", exist
                                 model: json.model || "Auto",
                                 tokensUsed: json.tokens_used || 0,
                             }));
+                        } else if (json.type === "thought" || json.type === "query_step" || json.type === "status") {
+                            setState(prev => ({
+                                ...prev,
+                                researchSteps: [...prev.researchSteps, { type: json.type, content: json.content }]
+                            }));
+                        } else if (json.type === "thought_time") {
+                            setState(prev => ({ ...prev, thoughtTime: json.time || 0 }));
                         } else if (json.type === "error") {
                             setState(prev => ({ ...prev, error: json.message || "Search failed" }));
                         }
-                    } catch {
-                        // Partial JSON — skip
+                    } catch (e) {
+                        console.error("[useSearch] Failed to parse JSON line:", trimmed, e);
                     }
                 }
             }
@@ -204,6 +233,7 @@ export function useSearch(initialQuery: string, focusMode: string = "all", exist
                 isConnecting: false,
             }));
         } finally {
+            console.log("[useSearch] runSearch finally block reached. Sources count:", state.sources.length);
             setState(prev => {
                 const nextState = { ...prev, isStreaming: false, isConnecting: false };
 
@@ -276,7 +306,7 @@ export function useSearch(initialQuery: string, focusMode: string = "all", exist
 
     useEffect(() => {
         // If we are passing an existing threadId, DO NOT run search, hydrate instead
-        if (existingThreadId) {
+        if (existingThreadId && !hasStarted.current) {
             if (typeof window !== "undefined") {
                 try {
                     const threadsJson = localStorage.getItem("orivanta_threads");
@@ -297,6 +327,7 @@ export function useSearch(initialQuery: string, focusMode: string = "all", exist
                             }));
                             threadIdRef.current = thread.id;
                             hasStarted.current = true;
+                            lastProcessedQuery.current = thread.query;
                             return; // Stop here, fully hydrated!
                         }
                     }
@@ -306,17 +337,18 @@ export function useSearch(initialQuery: string, focusMode: string = "all", exist
             }
         }
 
-        // Otherwise (or if hydration failed), run fresh search
-        if (!initialQuery || hasStarted.current) return;
-        hasStarted.current = true;
+        // Otherwise (or if hydration failed), run fresh search if query changed
+        if (!initialQuery || (hasStarted.current && lastProcessedQuery.current === initialQuery)) return;
 
-        // If we are starting fresh with a query, but it matches the last thread's query precisely, 
-        // we could hydrate it here as well, but for now we rely on threadId for strict hydration.
+        hasStarted.current = true;
+        lastProcessedQuery.current = initialQuery;
 
         runSearch(initialQuery, focusMode);
         return () => {
-            hasStarted.current = false;
+            // We abort the in-flight request on cleanup
+            console.log("[useSearch] useEffect Cleanup triggered");
             abortRef.current?.abort();
+            lastProcessedQuery.current = null;
         };
     }, [initialQuery, focusMode, existingThreadId, runSearch]);
 

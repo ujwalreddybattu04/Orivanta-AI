@@ -22,7 +22,12 @@ async def search_stream(request: SearchRequest):
     try:
         return StreamingResponse(
             search_orchestrator.stream_search(request.query, request.focus_mode, request.messages),
-            media_type="text/event-stream"
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no" # Essential for Nginx if present
+            }
         )
     except Exception as e:
         logger.error(f"Error in search stream: {e}", exc_info=True)

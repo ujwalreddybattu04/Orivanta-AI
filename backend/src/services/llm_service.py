@@ -25,11 +25,12 @@ class GroqLLMService:
             "Your goal is to provide comprehensive, accurate, and well-structured answers "
             "based strictly on the provided web search context.\n\n"
             "CRITICAL INSTRUCTIONS:\n"
-            "1. You MUST use inline citations in the format [1], [2], etc., immediately after the fact they support.\n"
+            "1. You MUST use inline citations in the format [1], [2], [3], etc., immediately after the fact they support.\n"
             "2. Ensure citations correspond EXACTLY to the numbers assigned in the context block below.\n"
             "3. Do NOT make up information. If the context does not contain the answer, state that you don't know based on the search results.\n"
-            "4. Format the output using beautiful Markdown: use bold text, bullet points, and headers (## or ###) to make the answer easy to read.\n"
-            "5. Do NOT output a 'References' or 'Sources' list at the very end. The frontend UI handles the sources panel. ONLY use inline citations like [1].\n\n"
+            "4. Format the output using beautiful Markdown: use bold text, bullet points, and headers (## or ###) for a clean structure.\n"
+            "5. ABSOLUTE FORBIDDEN: Do NOT output a 'References', 'Sources', or bibliography list at the end. The frontend UI handles the sources independently. ONLY use inline citation numbers like [1]. If you output a list of sources at the end, the user will be unable to see the answer. DO NOT LIST URLs.\n"
+            "6. CRITICAL: Start the answer DIRECTLY. No conversational meta-talk or internal monologues.\n\n"
             "CONTEXT block:\n"
         )
         
@@ -77,6 +78,40 @@ class GroqLLMService:
         except Exception as e:
             logger.exception(f"Groq API streaming failed: {e}")
             raise e
+
+    async def generate_research_plan(self, query: str) -> Dict[str, Any]:
+        """
+        Generates a formal research intent and 3-4 specific search strings.
+        Used for the 'Thinking' UI phase.
+        """
+        if not self.client:
+            return {"intent": f"Search for {query}", "queries": [query]}
+            
+        system_prompt = (
+            "You are a Research Architect. Given a user query, refine it into a single professional "
+            "research intent statement and 3-4 specific, optimized search queries for a web search engine.\n\n"
+            "Output EXACTLY in the following JSON format:\n"
+            "{\n"
+            "  \"intent\": \"A professional, dynamic research objective (e.g., 'Synthesizing market trends for Nvidia...', 'Analyzing historical etymology...', 'Mapping technical specifications...')\",\n"
+            "  \"queries\": [\"sub-query 1\", \"sub-query 2\", \"sub-query 3\"]\n"
+            "}"
+        )
+        
+        try:
+            chat_completion = await self.client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": query}
+                ],
+                model=self.default_model,
+                temperature=0.3,
+                max_tokens=200,
+                response_format={"type": "json_object"}
+            )
+            return json.loads(chat_completion.choices[0].message.content)
+        except Exception as e:
+            logger.error(f"Error generating research plan: {str(e)}")
+            return {"intent": f"Searching for {query}...", "queries": [query]}
 
     async def generate_thread_title(self, query: str) -> str:
         """

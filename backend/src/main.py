@@ -2,12 +2,15 @@
 Orivanta AI — FastAPI Application Entry Point
 """
 
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.config.settings import settings
 from src.api.v1.router import api_router
 from src.core.events import create_start_app_handler, create_stop_app_handler
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Orivanta AI API",
@@ -17,10 +20,10 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# CORS
+# CORS - Allow all for development flexibility
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,3 +40,7 @@ app.add_event_handler("shutdown", create_stop_app_handler(app))
 @app.get("/health", tags=["Health"])
 async def health_check():
     return {"status": "healthy", "service": "orivanta-ai"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("src.main:app", host="0.0.0.0", port=8000, reload=True)

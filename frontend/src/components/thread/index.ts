@@ -6,6 +6,7 @@ export { default as SourceCard } from "./SourceCard";
 export { default as SourcesPanel } from "./SourcesPanel";
 export { default as ImagesGrid } from "./ImagesGrid";
 export { default as RelatedQuestions } from "./RelatedQuestions";
+export * from "./ResearchProgress";
 export { default as CitationBadge } from "./CitationBadge";
 export { default as ModelSelector } from "./ModelSelector";
 export { default as CopyButton } from "./CopyButton";

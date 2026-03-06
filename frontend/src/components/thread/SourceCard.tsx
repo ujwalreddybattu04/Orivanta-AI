@@ -25,19 +25,19 @@ export default function SourceCard({ index, title, url, domain, faviconUrl, snip
                 <div className="source-card-content">
                     {/* Header: favicon + domain */}
                     <div className="source-card-header">
-                        {faviconUrl || domain ? (
-                            <div className="source-card-icon-img">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                    src={faviconUrl || `https://www.google.com/s2/favicons?domain=${domain}&sz=128`}
-                                    alt=""
-                                    width={16}
-                                    height={16}
-                                />
-                            </div>
-                        ) : (
-                            <div className="source-card-letter">{domain ? domain[0].toUpperCase() : "?"}</div>
-                        )}
+                        <div className="source-card-icon-img">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                src={`https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${url}&size=64`}
+                                alt=""
+                                width={16}
+                                height={16}
+                                onError={(e) => {
+                                    (e.currentTarget as any).style.display = 'none';
+                                    (e.currentTarget as any).parentElement.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-globe opacity-40"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20"/><path d="M2 12h20"/></svg>';
+                                }}
+                            />
+                        </div>
                         <span className="source-card-domain">{domain}</span>
                         <svg
                             className="source-card-external"

@@ -1,7 +1,8 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import { Suspense, useState, useCallback } from "react";
+import { Suspense, useState, useCallback, useEffect } from "react";
+import { motion } from "framer-motion";
 import { useSearch } from "@/hooks/useSearch";
 import AnswerStream from "@/components/thread/AnswerStream";
 import AnswerSkeleton from "@/components/thread/AnswerSkeleton";
@@ -15,7 +16,7 @@ function SearchPageContent() {
     const threadId = searchParams.get("id") || undefined;
     const [followUp, setFollowUp] = useState("");
     const [activeTab, setActiveTab] = useState<"answer" | "links" | "images">("answer");
-    const [sourcesPanelOpen, setSourcesPanelOpen] = useState(true);
+    const [sourcesPanelOpen, setSourcesPanelOpen] = useState(false);
     const [copied, setCopied] = useState(false);
 
     const {
@@ -24,11 +25,13 @@ function SearchPageContent() {
         answer,
         sources,
         images,
+        researchSteps,
         relatedQuestions,
         isStreaming,
         isConnecting,
         error,
         model,
+        thoughtTime,
         appendQuery
     } = useSearch(query, focusMode, threadId);
 
@@ -53,6 +56,26 @@ function SearchPageContent() {
     const isLoading = isConnecting && !answer && !error;
     const hasSources = sources.length > 0;
 
+    // Scroll to the new query when it becomes active
+    useEffect(() => {
+        if (currentQuery && (isConnecting || isStreaming)) {
+            const queryRow = document.getElementById("current-query-row");
+            const scrollable = document.querySelector(".sp-content");
+            if (queryRow && scrollable) {
+                // Wait slightly for the motion.div to mount and begin expanding
+                setTimeout(() => {
+                    if (history.length > 0) {
+                        // For follow-ups: perfectly frame the new query at the top of the view
+                        queryRow.scrollIntoView({ behavior: "smooth", block: "start" });
+                    } else {
+                        // For the first query: just ensure we're at the bottom so the initial animations look clean
+                        scrollable.scrollTo({ top: scrollable.scrollHeight, behavior: "smooth" });
+                    }
+                }, 50);
+            }
+        }
+    }, [currentQuery, isConnecting, isStreaming, history.length]);
+
     return (
         <div className="sp-page">
             <div className={`sp-layout ${sourcesPanelOpen ? "sp-layout--panel-open" : ""}`}>
@@ -61,7 +84,12 @@ function SearchPageContent() {
                 <div className="sp-main">
 
                     {/* Tab Bar */}
-                    <div className="sp-tabbar">
+                    <motion.div
+                        className="sp-tabbar"
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3, ease: "easeOut" }}
+                    >
                         <div className="sp-tabs" role="tablist" aria-label="Search views">
                             <button
                                 role="tab"
@@ -106,7 +134,7 @@ function SearchPageContent() {
                                 Share
                             </button>
                         </div>
-                    </div>
+                    </motion.div>
 
                     {/* Scrollable Content Area */}
                     <div className="sp-content">
@@ -116,33 +144,34 @@ function SearchPageContent() {
                             {/* === ANSWER TAB === */}
                             {activeTab === "answer" && (
                                 <>
-                                    {/* History map */}
+                                    {/* History — stable, no animations, no re-renders */}
                                     {history && history.map((turn, idx) => (
-                                        <div key={idx} className="sp-thread-turn">
+                                        <div key={`history-${idx}`} className="sp-thread-turn">
                                             <div className="sp-query-row">
                                                 <div className="sp-query-bubble">{turn.query}</div>
                                             </div>
                                             <div className="sp-answer-body">
                                                 <AnswerStream
+                                                    query={turn.query}
                                                     content={turn.answer}
                                                     isStreaming={false}
                                                     sources={turn.sources}
-                                                    onCopy={() => {
-                                                        navigator.clipboard.writeText(turn.answer);
-                                                        setCopied(true);
-                                                        setTimeout(() => setCopied(false), 2000);
-                                                    }}
+                                                    onCopy={handleCopy}
                                                 />
                                             </div>
                                         </div>
                                     ))}
 
                                     {/* Current Turn Query */}
-                                    <div className="sp-query-row">
+                                    <motion.div
+                                        className="sp-query-row"
+                                        id="current-query-row"
+                                        initial={{ opacity: 0, y: 15 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1.0] }}
+                                    >
                                         <div className="sp-query-bubble">{currentQuery}</div>
-                                    </div>
-
-                                    {isLoading && <AnswerSkeleton />}
+                                    </motion.div>
 
                                     {error && !isLoading && (
                                         <div className="sp-error">
@@ -157,15 +186,24 @@ function SearchPageContent() {
                                         </div>
                                     )}
 
+                                    {/* Current answer */}
                                     {(answer || isStreaming) && (
-                                        <div className="sp-answer-body">
+                                        <motion.div
+                                            className="sp-answer-body"
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
+                                        >
                                             <AnswerStream
+                                                query={currentQuery}
                                                 content={answer}
                                                 isStreaming={isStreaming}
                                                 sources={sources}
+                                                researchSteps={researchSteps}
+                                                thoughtTime={thoughtTime}
                                                 onCopy={handleCopy}
                                             />
-                                        </div>
+                                        </motion.div>
                                     )}
 
                                     {/* Action row */}
@@ -188,28 +226,34 @@ function SearchPageContent() {
                                                 <button className="sp-icon-btn" title="Reload">
                                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /></svg>
                                                 </button>
-                                                {/* Sources badge pill — Integrated with sourcesPanelOpen state */}
+                                                {/* Sources action button - restored as requested */}
                                                 <button
-                                                    className={`sp-sources-badge ${!hasSources ? "sp-sources-badge--hidden" : ""} ${sourcesPanelOpen ? "sp-sources-badge--active" : ""}`}
+                                                    className={`sp-sources-action-btn ${sourcesPanelOpen ? "active" : ""}`}
                                                     onClick={() => setSourcesPanelOpen(!sourcesPanelOpen)}
-                                                    id="sources-toggle-btn"
-                                                    aria-expanded={sourcesPanelOpen}
-                                                    aria-controls="sources-panel"
-                                                    aria-label="View all sources"
+                                                    aria-label="View sources"
                                                 >
-                                                    <div className="sp-sources-badge-icons">
-                                                        {sources.slice(0, 3).map((src, i) => (
-                                                            <div key={i} className="sp-sources-badge-icon-wrapper" style={{ zIndex: 3 - i }}>
-                                                                {src.faviconUrl || src.domain ? (
-                                                                    // eslint-disable-next-line @next/next/no-img-element
-                                                                    <img src={src.faviconUrl || `https://www.google.com/s2/favicons?domain=${src.domain}&sz=128`} alt="" width={16} height={16} />
-                                                                ) : (
-                                                                    <div className="sp-sources-badge-icon-letter">{(src.domain[0] || "?").toUpperCase()}</div>
-                                                                )}
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                    <span className="sp-sources-badge-text">{sources.length} sources</span>
+                                                    {hasSources && (
+                                                        <div className="sp-sources-pill-favicons">
+                                                            {sources.slice(0, 3).map((source, i) => (
+                                                                <div
+                                                                    key={i}
+                                                                    className="sp-source-pill-icon"
+                                                                    style={{ zIndex: 3 - i }}
+                                                                >
+                                                                    {source.favicon ? (
+                                                                        <img src={source.favicon} alt="" />
+                                                                    ) : (
+                                                                        <span className="sp-source-pill-letter">
+                                                                            {(source.domain || source.url || "?").charAt(0).toUpperCase()}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    <span className="sp-sources-pill-text">
+                                                        {hasSources ? `${sources.length} sources` : "Sources"}
+                                                    </span>
                                                 </button>
                                             </div>
                                             <div className="sp-action-right">
@@ -248,31 +292,71 @@ function SearchPageContent() {
                                 </>
                             )}
 
-                            {/* === LINKS TAB === */}
+                            {/* === LINKS TAB — Perplexity-style search results === */}
                             {activeTab === "links" && (
                                 <div className="sp-links-tab">
                                     {sources.length === 0 ? (
-                                        <div className="sp-empty-tab">Links will appear here when the backend is connected.</div>
-                                    ) : (
-                                        <div className="sp-links-list">
-                                            {sources.map((src, i) => (
-                                                <a key={i} href={src.url} target="_blank" rel="noopener noreferrer" className="sp-link-item">
-                                                    <div className="sp-link-favicon">
-                                                        {src.faviconUrl || src.domain ? (
-                                                            // eslint-disable-next-line @next/next/no-img-element
-                                                            <img src={src.faviconUrl || `https://www.google.com/s2/favicons?domain=${src.domain}&sz=128`} alt="" width={16} height={16} />
-                                                        ) : (
-                                                            <div className="sp-link-icon-letter">{(src.domain[0] || "?").toUpperCase()}</div>
-                                                        )}
-                                                    </div>
-                                                    <div className="sp-link-content">
-                                                        <div className="sp-link-domain">{src.domain}</div>
-                                                        <div className="sp-link-title">{src.title}</div>
-                                                        {src.snippet && <div className="sp-link-snippet">{src.snippet}</div>}
-                                                    </div>
-                                                </a>
-                                            ))}
+                                        <div className="sp-empty-tab">
+                                            {isLoading ? (
+                                                <div className="sp-links-loading">
+                                                    <div className="sp-links-loading-dot" />
+                                                    <span>Searching the web...</span>
+                                                </div>
+                                            ) : error ? (
+                                                <div className="sp-links-error">
+                                                    <div className="sp-error-icon">⚠️</div>
+                                                    <span>{error.includes("Tavily") ? "Web search limit reached (Tavily). Using internal knowledge." : error}</span>
+                                                </div>
+                                            ) : (
+                                                "No links found for this query."
+                                            )}
                                         </div>
+                                    ) : (
+                                        <>
+                                            <div className="sp-links-header">
+                                                Search results for: <strong>{currentQuery}</strong>
+                                            </div>
+                                            <div className="sp-links-list">
+                                                {sources.map((src, i) => (
+                                                    <a
+                                                        key={i}
+                                                        href={src.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="sp-link-item"
+                                                        id={`link-result-${i}`}
+                                                    >
+                                                        <div className="sp-link-left">
+                                                            {/* Favicon circle */}
+                                                            <div className="sp-link-favicon">
+                                                                <img
+                                                                    src={`https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${src.url}&size=64`}
+                                                                    alt=""
+                                                                    width={20}
+                                                                    height={20}
+                                                                    onError={(e) => {
+                                                                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                                                        const parent = e.currentTarget.parentElement;
+                                                                        if (parent) {
+                                                                            parent.innerHTML = `<span class="sp-link-favicon-letter">${(src.domain || 'W')[0].toUpperCase()}</span>`;
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                            {/* Content block */}
+                                                            <div className="sp-link-content">
+                                                                <div className="sp-link-meta">
+                                                                    <span className="sp-link-domain-name">{src.domain?.replace(/^www\./, '')}</span>
+                                                                </div>
+                                                                <div className="sp-link-url">{src.url}</div>
+                                                                <div className="sp-link-title">{src.title}</div>
+                                                                {src.snippet && <div className="sp-link-snippet">{src.snippet}</div>}
+                                                            </div>
+                                                        </div>
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        </>
                                     )}
                                 </div>
                             )}
@@ -340,8 +424,13 @@ function SearchPageContent() {
                     <div className="sp-sources-panel-header">
                         <div>
                             <h3 className="sp-sources-panel-title">
-                                {hasSources ? (sources.length >= 5 ? `${sources.length} sources` : "Sources") : "Sources"}
+                                {hasSources ? `${sources.length} sources` : "Sources"}
                             </h3>
+                            {hasSources && (
+                                <p className="sp-sources-panel-subtitle">
+                                    Sources for {currentQuery}
+                                </p>
+                            )}
                         </div>
                         <button
                             className="sp-sources-panel-close"
@@ -355,13 +444,17 @@ function SearchPageContent() {
                             {sources.map((src, i) => (
                                 <a key={i} href={src.url} target="_blank" rel="noopener noreferrer" className="sp-source-item" id={`source-item-${i + 1}`}>
                                     <div className="sp-source-item-icon">
-                                        {src.faviconUrl || src.domain ? (
-                                            // eslint-disable-next-line @next/next/no-img-element
-                                            <img src={src.faviconUrl || `https://www.google.com/s2/favicons?domain=${src.domain}&sz=128`} alt="" width={24} height={24} style={{ borderRadius: "50%" }}
-                                                onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                                        ) : (
-                                            <div className="sp-source-item-letter">{(src.domain[0] || "?").toUpperCase()}</div>
-                                        )}
+                                        <img
+                                            src={`https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${src.url}&size=64`}
+                                            alt=""
+                                            width={24}
+                                            height={24}
+                                            style={{ borderRadius: "50%" }}
+                                            onError={(e) => {
+                                                (e.currentTarget as any).style.display = 'none';
+                                                (e.currentTarget as any).parentElement.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-globe opacity-40"><circle cx="12" cy="12" r="10"/><path d="M12 2h20"/><path d="M12 2a14.5 14.5 0 0 0 0 20"/><path d="M2 12h20"/></svg>';
+                                            }}
+                                        />
                                     </div>
                                     <div className="sp-source-item-body">
                                         <div className="sp-source-item-domain-row">
