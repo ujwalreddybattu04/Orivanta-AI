@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useEffect, memo, useMemo } from "react";
+import { useRef, useEffect, memo, useMemo, useState } from "react";
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -14,10 +14,28 @@ interface AnswerStreamProps {
     researchSteps?: ResearchStep[];
     thoughtTime?: number;
     onCopy?: () => void;
+    sourcesPanelOpen?: boolean;
+    setSourcesPanelOpen?: (open: boolean) => void;
 }
 
-const AnswerStream = memo(({ query = "", content, isStreaming, sources, researchSteps = [], thoughtTime = 0, onCopy }: AnswerStreamProps) => {
+const AnswerStream = memo(({
+    query = "",
+    content,
+    isStreaming,
+    sources,
+    researchSteps = [],
+    thoughtTime = 0,
+    onCopy,
+    sourcesPanelOpen: externalSourcesPanelOpen,
+    setSourcesPanelOpen: externalSetSourcesPanelOpen
+}: AnswerStreamProps) => {
     const contentRef = useRef<HTMLDivElement>(null);
+    const [localCopied, setLocalCopied] = useState(false);
+    const [localSourcesPanelOpen, setLocalSourcesPanelOpen] = useState(false);
+
+    // Use external state if provided (for page-level control), otherwise use local state
+    const sourcesPanelOpen = externalSourcesPanelOpen !== undefined ? externalSourcesPanelOpen : localSourcesPanelOpen;
+    const setSourcesPanelOpen = externalSetSourcesPanelOpen !== undefined ? externalSetSourcesPanelOpen : setLocalSourcesPanelOpen;
 
     // Convert generic [1] citations into markdown links [1](1)
     let processedContent = content.replace(/\[(\d+)\]/g, '[$1]($1)');
@@ -68,6 +86,8 @@ const AnswerStream = memo(({ query = "", content, isStreaming, sources, research
 
     const handleCopy = () => {
         navigator.clipboard.writeText(content);
+        setLocalCopied(true);
+        setTimeout(() => setLocalCopied(false), 2000);
         onCopy?.();
     };
 
@@ -193,6 +213,70 @@ const AnswerStream = memo(({ query = "", content, isStreaming, sources, research
                             <span className="answer-cursor" aria-hidden="true">▋</span>
                         )}
                     </div>
+
+                    {/* Action row — Scoped per-message, delayed while streaming */}
+                    {(content.trim().length > 0 || sources.length > 0) && !isStreaming && (
+                        <div className="sp-action-row">
+                            <div className="sp-action-left">
+                                <button className="sp-icon-btn" onClick={handleCopy} title={localCopied ? "Copied!" : "Copy"}>
+                                    {localCopied ? (
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12" /></svg>
+                                    ) : (
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 2 8 6" /><line x1="12" x2="12" y1="2" y2="15" /></svg>
+                                    )}
+                                </button>
+                                <button className="sp-icon-btn" title="Download">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
+                                </button>
+                                <button className="sp-icon-btn" title="Copy text">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="14" height="14" x="8" y="8" rx="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
+                                </button>
+                                <button className="sp-icon-btn" title="Reload">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /></svg>
+                                </button>
+                                {/* Sources action button */}
+                                {sources.length > 0 && (
+                                    <button
+                                        className={`sp-sources-action-btn ${sourcesPanelOpen ? "active" : ""}`}
+                                        onClick={() => setSourcesPanelOpen(!sourcesPanelOpen)}
+                                        aria-label="View sources"
+                                    >
+                                        <div className="sp-sources-pill-favicons">
+                                            {sources.slice(0, 3).map((source, i) => (
+                                                <div
+                                                    key={i}
+                                                    className="sp-source-pill-icon"
+                                                    style={{ zIndex: 3 - i }}
+                                                >
+                                                    {source.favicon ? (
+                                                        <img src={source.favicon} alt="" />
+                                                    ) : (
+                                                        <span className="sp-source-pill-letter">
+                                                            {(source.domain || source.url || "?").charAt(0).toUpperCase()}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <span className="sp-sources-pill-text">
+                                            {sources.length} sources
+                                        </span>
+                                    </button>
+                                )}
+                            </div>
+                            <div className="sp-action-right">
+                                <button className="sp-icon-btn" title="Thumbs up">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 10v12" /><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" /></svg>
+                                </button>
+                                <button className="sp-icon-btn" title="Thumbs down">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 14V2" /><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z" /></svg>
+                                </button>
+                                <button className="sp-icon-btn" title="More">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" /></svg>
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

@@ -25,6 +25,8 @@ export interface SearchMessage {
     answer: string;
     sources: SearchSource[];
     images: SearchImage[];
+    researchSteps?: ResearchStep[];
+    thoughtTime?: number;
 }
 
 export interface ThreadData {
@@ -37,6 +39,8 @@ export interface ThreadData {
     answer: string;
     sources: SearchSource[];
     images: SearchImage[];
+    researchSteps?: ResearchStep[];
+    thoughtTime?: number;
 }
 
 // Simple UUID generator for browser
@@ -262,6 +266,8 @@ export function useSearch(initialQuery: string, focusMode: string = "all", exist
                             answer: nextState.answer,
                             sources: nextState.sources,
                             images: nextState.images,
+                            researchSteps: nextState.researchSteps,
+                            thoughtTime: nextState.thoughtTime,
                         };
 
                         if (existingIdx >= 0) {
@@ -292,7 +298,9 @@ export function useSearch(initialQuery: string, focusMode: string = "all", exist
                 query: state.query,
                 answer: state.answer,
                 sources: state.sources,
-                images: state.images
+                images: state.images,
+                researchSteps: state.researchSteps,
+                thoughtTime: state.thoughtTime
             }];
         }
 
@@ -322,6 +330,8 @@ export function useSearch(initialQuery: string, focusMode: string = "all", exist
                                 answer: thread.answer,
                                 sources: thread.sources,
                                 images: thread.images,
+                                researchSteps: thread.researchSteps || [],
+                                thoughtTime: thread.thoughtTime || 0,
                                 isConnecting: false,
                                 isStreaming: false
                             }));

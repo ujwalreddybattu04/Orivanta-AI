@@ -17,6 +17,8 @@ function SearchPageContent() {
     const [followUp, setFollowUp] = useState("");
     const [activeTab, setActiveTab] = useState<"answer" | "links" | "images">("answer");
     const [sourcesPanelOpen, setSourcesPanelOpen] = useState(false);
+    const [activePanelSources, setActivePanelSources] = useState<any[]>([]);
+    const [activePanelQuery, setActivePanelQuery] = useState("");
     const [copied, setCopied] = useState(false);
 
     const {
@@ -35,6 +37,33 @@ function SearchPageContent() {
         appendQuery
     } = useSearch(query, focusMode, threadId);
 
+    // --- EFFECT: When global sources update, update the active panel IF it was for the current query ---
+    useEffect(() => {
+        if (sources.length > 0 && !isStreaming) {
+            // If the panel is open and showing the current query (or just opened), update it
+            if (activePanelQuery === "" || activePanelQuery === currentQuery) {
+                setActivePanelSources(sources);
+                setActivePanelQuery(currentQuery);
+            }
+        }
+    }, [sources, isStreaming, currentQuery, activePanelQuery]);
+
+    const toggleSourcesPanel = (open: boolean, msgSources?: any[], msgQuery?: string) => {
+        if (open) {
+            if (msgSources && msgQuery) {
+                setActivePanelSources(msgSources);
+                setActivePanelQuery(msgQuery);
+            } else {
+                // Fallback to latest
+                setActivePanelSources(sources);
+                setActivePanelQuery(currentQuery);
+            }
+            setSourcesPanelOpen(true);
+        } else {
+            setSourcesPanelOpen(false);
+        }
+    };
+
     const handleFollowUp = useCallback((e: React.FormEvent) => {
         e.preventDefault();
         const queryText = followUp.trim();
@@ -46,6 +75,8 @@ function SearchPageContent() {
     const handleRelatedSelect = useCallback((q: string) => {
         appendQuery(q);
     }, [appendQuery]);
+
+
 
     const handleCopy = useCallback(() => {
         navigator.clipboard.writeText(answer);
@@ -156,7 +187,11 @@ function SearchPageContent() {
                                                     content={turn.answer}
                                                     isStreaming={false}
                                                     sources={turn.sources}
+                                                    researchSteps={turn.researchSteps}
+                                                    thoughtTime={turn.thoughtTime}
                                                     onCopy={handleCopy}
+                                                    sourcesPanelOpen={sourcesPanelOpen && activePanelQuery === turn.query}
+                                                    setSourcesPanelOpen={(open) => toggleSourcesPanel(open, turn.sources, turn.query)}
                                                 />
                                             </div>
                                         </div>
@@ -202,73 +237,13 @@ function SearchPageContent() {
                                                 researchSteps={researchSteps}
                                                 thoughtTime={thoughtTime}
                                                 onCopy={handleCopy}
+                                                sourcesPanelOpen={sourcesPanelOpen && activePanelQuery === currentQuery}
+                                                setSourcesPanelOpen={(open) => toggleSourcesPanel(open, sources, currentQuery)}
                                             />
                                         </motion.div>
                                     )}
 
-                                    {/* Action row */}
-                                    {(answer || hasSources) && (
-                                        <div className="sp-action-row">
-                                            <div className="sp-action-left">
-                                                <button className="sp-icon-btn" onClick={handleCopy} title={copied ? "Copied!" : "Copy"}>
-                                                    {copied ? (
-                                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12" /></svg>
-                                                    ) : (
-                                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 2 8 6" /><line x1="12" x2="12" y1="2" y2="15" /></svg>
-                                                    )}
-                                                </button>
-                                                <button className="sp-icon-btn" title="Download">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
-                                                </button>
-                                                <button className="sp-icon-btn" title="Copy text">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="14" height="14" x="8" y="8" rx="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
-                                                </button>
-                                                <button className="sp-icon-btn" title="Reload">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /></svg>
-                                                </button>
-                                                {/* Sources action button - restored as requested */}
-                                                <button
-                                                    className={`sp-sources-action-btn ${sourcesPanelOpen ? "active" : ""}`}
-                                                    onClick={() => setSourcesPanelOpen(!sourcesPanelOpen)}
-                                                    aria-label="View sources"
-                                                >
-                                                    {hasSources && (
-                                                        <div className="sp-sources-pill-favicons">
-                                                            {sources.slice(0, 3).map((source, i) => (
-                                                                <div
-                                                                    key={i}
-                                                                    className="sp-source-pill-icon"
-                                                                    style={{ zIndex: 3 - i }}
-                                                                >
-                                                                    {source.favicon ? (
-                                                                        <img src={source.favicon} alt="" />
-                                                                    ) : (
-                                                                        <span className="sp-source-pill-letter">
-                                                                            {(source.domain || source.url || "?").charAt(0).toUpperCase()}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                    <span className="sp-sources-pill-text">
-                                                        {hasSources ? `${sources.length} sources` : "Sources"}
-                                                    </span>
-                                                </button>
-                                            </div>
-                                            <div className="sp-action-right">
-                                                <button className="sp-icon-btn" title="Thumbs up">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 10v12" /><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" /></svg>
-                                                </button>
-                                                <button className="sp-icon-btn" title="Thumbs down">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 14V2" /><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z" /></svg>
-                                                </button>
-                                                <button className="sp-icon-btn" title="More">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" /></svg>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
+
 
                                     {/* Follow-ups */}
                                     {!isStreaming && relatedQuestions.length > 0 && (
@@ -424,11 +399,11 @@ function SearchPageContent() {
                     <div className="sp-sources-panel-header">
                         <div>
                             <h3 className="sp-sources-panel-title">
-                                {hasSources ? `${sources.length} sources` : "Sources"}
+                                {activePanelSources.length > 0 ? `${activePanelSources.length} sources` : "Sources"}
                             </h3>
-                            {hasSources && (
+                            {activePanelSources.length > 0 && (
                                 <p className="sp-sources-panel-subtitle">
-                                    Sources for {currentQuery}
+                                    Sources for {activePanelQuery}
                                 </p>
                             )}
                         </div>
@@ -439,9 +414,9 @@ function SearchPageContent() {
                         >✕</button>
                     </div>
 
-                    {hasSources ? (
+                    {activePanelSources.length > 0 ? (
                         <div className="sp-sources-panel-list">
-                            {sources.map((src, i) => (
+                            {activePanelSources.map((src, i) => (
                                 <a key={i} href={src.url} target="_blank" rel="noopener noreferrer" className="sp-source-item" id={`source-item-${i + 1}`}>
                                     <div className="sp-source-item-icon">
                                         <img

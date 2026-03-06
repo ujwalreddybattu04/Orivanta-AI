@@ -54,12 +54,11 @@ class SearchOrchestrator:
                 # Visual pop timing
                 await asyncio.sleep(0.05)
 
-            # --- PHASE 2: SYNC SEARCH RESULTS (Background) ---
-            # We fetch results here to calculate thought time, but DO NOT YIELD YET
+            # --- PHASE 2: SYNC SEARCH RESULTS ---
             search_results = await search_task
             logger.info(f"Search results received: {len(search_results)} items")
             
-            # Format sources for frontend (Ready for later)
+            # Format sources for frontend
             frontend_sources = []
             for idx, res in enumerate(search_results, start=1):
                 domain = res.get("domain", "website")
@@ -72,6 +71,9 @@ class SearchOrchestrator:
                     "citationIndex": idx
                 })
             
+            # Yield sources as soon as they are ready for the Analysis Bar
+            yield f"data: {json.dumps({'type': 'sources', 'sources': frontend_sources, 'items': frontend_sources})}\n\n"
+            
             # --- PHASE 3: START LLM STREAM ---
             thought_time = time.time() - start_time
             yield f"data: {json.dumps({'type': 'thought_time', 'time': round(thought_time, 1)})}\n\n"
@@ -81,11 +83,6 @@ class SearchOrchestrator:
             # Stream LLM answer directly
             async for chunk in groq_llm_service.stream_answer(query, search_results, messages):
                 yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
-            
-            # --- PHASE 4: FINAL SOURCES (Delayed for UX) ---
-            # Yield sources ONLY AFTER synthesis is done
-            if len(frontend_sources) > 0:
-                yield f"data: {json.dumps({'type': 'sources', 'sources': frontend_sources, 'items': frontend_sources})}\n\n"
                 
             yield "data: {\"type\":\"done\"}\n\n"
             
