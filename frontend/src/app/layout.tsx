@@ -8,6 +8,7 @@ import "@/styles/searchbar.css";
 import "@/styles/home.css";
 import "@/styles/thread.css";
 import "@/styles/components/PrivateToggle.css";
+import { Suspense } from "react";
 import { Sidebar } from "@/components/layout";
 import { SITE_TITLE, SITE_DESCRIPTION } from "@/config/constants";
 
@@ -35,7 +36,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </head>
             <body>
                 <div className="app-shell">
-                    <Sidebar />
+                    <Suspense fallback={<div style={{ width: "240px", backgroundColor: "var(--sidebar-bg)" }} />}>
+                        <Sidebar />
+                    </Suspense>
                     <main className="main-content">{children}</main>
                 </div>
             </body>
