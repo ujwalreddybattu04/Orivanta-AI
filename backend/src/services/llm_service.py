@@ -5,7 +5,7 @@ from typing import AsyncGenerator, Dict, Any, List
 
 from groq import AsyncGroq
 from src.config.settings import settings
-from src.config.prompts import RAG_SYSTEM_PROMPT, DIRECT_SYSTEM_PROMPT, PLANNING_SYSTEM_PROMPT, TITLE_SYSTEM_PROMPT
+from src.config.prompts import RAG_SYSTEM_PROMPT, DIRECT_SYSTEM_PROMPT, PLANNING_SYSTEM_PROMPT, TITLE_SYSTEM_PROMPT, FOLLOW_UP_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +72,7 @@ class GroqLLMService:
                 temperature=0.2, # Low temperature for factual RAG
                 max_tokens=2048,
                 stream=True,
+                stop=["\n\n**Sources", "\n\nSources", "\n\nReferences", "## Sources"]
             )
             
             async for chunk in stream:
@@ -131,5 +132,37 @@ class GroqLLMService:
         except Exception as e:
             logger.error(f"Error generating title: {str(e)}")
             return "New Thread"
+
+    async def generate_follow_up_questions(self, query: str, context: list) -> list[str]:
+        """
+        Generates exactly 3 follow-up questions based on the query and context.
+        Designed to be run concurrently with the main answer stream.
+        """
+        if not self.client:
+            return []
+            
+        system_prompt = FOLLOW_UP_SYSTEM_PROMPT
+        
+        # Create a lightweight context summary to save tokens
+        context_str = " ".join([f"{item.get('title', '')}: {item.get('content', '')}" for item in context])[:3000]
+        user_prompt = f"Original Query: {query}\n\nContext: {context_str}"
+        
+        try:
+            chat_completion = await self.client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                model=self.default_model,
+                temperature=0.4,
+                response_format={"type": "json_object"}
+            )
+            response_text = chat_completion.choices[0].message.content
+            parsed = json.loads(response_text)
+            questions = parsed.get("questions", [])
+            return questions[:5]
+        except Exception as e:
+            logger.error(f"Error generating follow-ups: {str(e)}")
+            return []
 
 groq_llm_service = GroqLLMService()

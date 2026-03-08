@@ -7,7 +7,7 @@ import { useSearch } from "@/hooks/useSearch";
 import AnswerStream from "@/components/thread/AnswerStream";
 import AnswerSkeleton from "@/components/thread/AnswerSkeleton";
 import ImagesGrid from "@/components/thread/ImagesGrid";
-import { Sparkles, Globe, Image as ImageIcon, Pencil, Copy, Check } from "lucide-react";
+import { Sparkles, Globe, Image as ImageIcon, Pencil, Copy, Check, CornerDownRight } from "lucide-react";
 import { Favicon } from "@/components/common";
 
 function SearchPageContent() {
@@ -360,31 +360,13 @@ function SearchPageContent() {
                                                 onCopy={handleCopy}
                                                 sourcesPanelOpen={sourcesPanelOpen && activePanelQuery === currentQuery}
                                                 setSourcesPanelOpen={(open) => toggleSourcesPanel(open, sources, currentQuery)}
+                                                relatedQuestions={relatedQuestions}
+                                                onRelatedSelect={handleRelatedSelect}
                                             />
                                         </motion.div>
                                     )}
 
-
-
-                                    {/* Follow-ups */}
-                                    {!isStreaming && relatedQuestions.length > 0 && (
-                                        <div className="sp-followups">
-                                            <div className="sp-followups-title">Follow-ups</div>
-                                            <div className="sp-followups-list">
-                                                {relatedQuestions.map((q, i) => (
-                                                    <button
-                                                        key={i}
-                                                        className="sp-followup-item"
-                                                        onClick={() => handleRelatedSelect(q)}
-                                                        id={`followup-${i}`}
-                                                    >
-                                                        <span className="sp-followup-arrow">↳</span>
-                                                        <span className="sp-followup-text">{q}</span>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
+                                    {/* Follow-ups moved to AnswerStream */}
                                 </>
                             )}
 
@@ -596,11 +578,6 @@ function SearchPageContent() {
                             <h3 className="sp-sources-panel-title">
                                 {activePanelSources.length > 0 ? `${activePanelSources.length} sources` : "Sources"}
                             </h3>
-                            {activePanelSources.length > 0 && (
-                                <p className="sp-sources-panel-subtitle">
-                                    Sources for {activePanelQuery}
-                                </p>
-                            )}
                         </div>
                         <button
                             className="sp-sources-panel-close"

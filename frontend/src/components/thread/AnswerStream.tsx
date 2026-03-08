@@ -14,6 +14,7 @@ import "katex/dist/katex.min.css";
 // Syntax Highlighting
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { CornerDownRight } from "lucide-react";
 
 interface AnswerStreamProps {
     query?: string;
@@ -25,6 +26,8 @@ interface AnswerStreamProps {
     onCopy?: () => void;
     sourcesPanelOpen?: boolean;
     setSourcesPanelOpen?: (open: boolean) => void;
+    relatedQuestions?: string[];
+    onRelatedSelect?: (question: string) => void;
 }
 
 const AnswerStream = memo(({
@@ -36,7 +39,9 @@ const AnswerStream = memo(({
     thoughtTime = 0,
     onCopy,
     sourcesPanelOpen: externalSourcesPanelOpen,
-    setSourcesPanelOpen: externalSetSourcesPanelOpen
+    setSourcesPanelOpen: externalSetSourcesPanelOpen,
+    relatedQuestions = [],
+    onRelatedSelect
 }: AnswerStreamProps) => {
     const contentRef = useRef<HTMLDivElement>(null);
     const [localCopied, setLocalCopied] = useState(false);
@@ -52,8 +57,28 @@ const AnswerStream = memo(({
     // Normalize any escaped brackets: \[1\] -> [1]
     processedContent = processedContent.replace(/\\\[(\d+)\\\]/g, '[$1]');
 
-    // Group adjacent citations, but ONLY if they aren't already part of a markdown link
-    processedContent = processedContent.replace(/((?:\[\d+\])+)(?!\()/g, (match) => {
+    // Normalize AI hallucinations: **1** -> [1], ^1^ -> [1], [ 1 ] -> [1]
+    processedContent = processedContent.replace(/\*\*(\d+)\*\*/g, '[$1]');
+    processedContent = processedContent.replace(/\^(\d+)\^/g, '[$1]');
+    processedContent = processedContent.replace(/\[\s*(\d+)\s*\]/g, '[$1]');
+
+    // Normalize plain numbers hallucinated at the end of sentences (e.g., "word 1. ")
+    processedContent = processedContent.replace(/([a-zA-Z])\s+(\d+)([\.,])(?=\s|$)/g, (match, letter, num, punc) => {
+        const sourceIdx = parseInt(num, 10);
+        if (sourceIdx >= 1 && sourceIdx <= sources.length) {
+            return `${letter} [${num}]${punc}`;
+        }
+        return match; // Ignore if it's not a valid source range (avoids false positives like "Top 5.")
+    });
+
+    // Normalize comma-separated citations: [1, 2, 3] -> [1][2][3]
+    processedContent = processedContent.replace(/\[([0-9,\s]+)\]/g, (match, inner) => {
+        const nums = inner.split(',').map((n: string) => n.trim()).filter((n: string) => n);
+        return nums.map((n: string) => `[${n}]`).join('');
+    });
+
+    // Group adjacent citations (even if there are spaces between them), but ONLY if they aren't already part of a markdown link
+    processedContent = processedContent.replace(/((?:\[\d+\]\s*)+)(?!\()/g, (match) => {
         const indices = match.match(/\d+/g)?.join(',') || "";
         return `[${indices}](citation:${indices})`;
     });
@@ -195,26 +220,44 @@ const AnswerStream = memo(({
             a: ({ href, children }: any) => {
                 const decodedHref = href ? decodeURIComponent(href) : "";
 
-                // Handle Citation Pills: [1,2,3](citation:1,2,3) or legacy formats
-                // We use a robust check that handles spaces potentially added by hallucinating LLMs
-                const isCitation = decodedHref && (
+                // 1. Is it using our internal citation scheme? (e.g., citation:1)
+                const isExplicitCitationURL = decodedHref && (
                     decodedHref.trim().replace(/\s/g, '').startsWith("citation:") ||
                     decodedHref.trim().replace(/\s/g, '').includes("citation:") ||
                     decodedHref.trim().replace(/\s/g, '').startsWith("cite:") ||
                     decodedHref.trim().replace(/\s/g, '').includes("cite:")
                 );
 
-                if (isCitation) {
+                let isMarkdownLinkCitation = false;
+                let citationIndices: number[] = [];
+
+                if (isExplicitCitationURL) {
                     const normalizedHref = decodedHref.trim().replace(/\s/g, '');
                     const parts = normalizedHref.split(normalizedHref.includes("citation:") ? "citation:" : "cite:");
                     const indicesStr = parts[parts.length - 1];
-                    const indices = indicesStr.split(",").map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+                    citationIndices = indicesStr.split(",").map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+                } else if (children) {
+                    // 2. Intercept AI hallucinating real URLs but using numbers as the text (e.g., [1](https://...))
+                    // We extract the text, strip brackets, and check if it's purely a number mapping to our sources.
+                    const textContent = Array.isArray(children) ? children.join('') : String(children);
+                    const cleanText = textContent.trim().replace(/[\[\]]/g, '');
 
-                    if (indices.length === 0) return <span>{children}</span>;
+                    if (/^[\d,\s]+$/.test(cleanText)) {
+                        const nums = cleanText.split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n));
+                        if (nums.length > 0 && nums.every(n => n >= 1 && n <= sources.length)) {
+                            isMarkdownLinkCitation = true;
+                            citationIndices = nums;
+                        }
+                    }
+                }
 
-                    const primaryIdx = indices[0];
+                // If it's any form of citation (explicit or hallucinated markdown link), render the Pillar!
+                if (isExplicitCitationURL || isMarkdownLinkCitation) {
+                    if (citationIndices.length === 0) return <span>{children}</span>;
+
+                    const primaryIdx = citationIndices[0];
                     const primarySource = sources[primaryIdx - 1];
-                    const extraCount = indices.length - 1;
+                    const extraCount = citationIndices.length - 1;
 
                     // If we have data for the source, show the professional pill
                     if (primarySource) {
@@ -248,14 +291,18 @@ const AnswerStream = memo(({
                     // Premium Fallback: Small glassmorphic number pill (Billion Dollar style)
                     return (
                         <a
-                            href="#"
+                            href={decodedHref.startsWith('http') ? decodedHref : "#"}
                             className="answer-source-pill-mini"
-                            title="Source details loading..."
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="View Source"
                         >
                             {primaryIdx}{extraCount > 0 ? `+${extraCount}` : ""}
                         </a>
                     );
                 }
+
+                // Standard text hyperlink
                 return <a href={href} className="answer-link" target="_blank" rel="noopener noreferrer">{children}</a>;
             },
             table: ({ children }: any) => (
@@ -410,6 +457,29 @@ const AnswerStream = memo(({
                             </div>
                         </div>
                     )}
+
+                    {/* Follow-ups - Now beautifully constrained to the exact AnswerStream width */}
+                    {!isStreaming && relatedQuestions.length > 0 && (
+                        <div className="sp-followups">
+                            <div className="sp-followups-title">Follow-ups</div>
+                            <div className="sp-followups-list">
+                                {relatedQuestions.map((q, i) => (
+                                    <button
+                                        key={i}
+                                        className="sp-followup-item"
+                                        onClick={() => onRelatedSelect?.(q)}
+                                        id={`followup-${i}`}
+                                    >
+                                        <span className="sp-followup-arrow">
+                                            <CornerDownRight size={16} strokeWidth={2} />
+                                        </span>
+                                        <span className="sp-followup-text">{q}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                 </div>
             )}
         </div>

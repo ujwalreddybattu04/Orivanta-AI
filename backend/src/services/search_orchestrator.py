@@ -115,9 +115,38 @@ class SearchOrchestrator:
             yield f"data: {json.dumps({'type': 'thought_time', 'time': round(thought_time, 1)})}\n\n"
             yield f"data: {json.dumps({'type': 'status', 'content': 'Thinking'})}\n\n"
 
+            # CONCURRENT TASK: Generate follow-up questions while the main answer streams
+            follow_up_task = asyncio.create_task(
+                groq_llm_service.generate_follow_up_questions(query, search_results)
+            )
+
+            import re
+            
+            # Robust buffer to catch 'Sources' sections even if split across tokens
+            buffer = ""
+            # Regex to detect common hallucinated bibliography headers
+            cutoff_pattern = re.compile(r'\n+(?:\*\*|### |# )?(?:Sources|References|Bibliography)(?:\*\*|:)?\n+', re.IGNORECASE)
+            
             async for chunk in groq_llm_service.stream_answer(query, search_results, messages):
+                buffer += chunk
+                
+                # Check for 'Sources' pattern in the last ~100 chars (performance optimization)
+                search_window = buffer[-100:] if len(buffer) > 100 else buffer
+                if cutoff_pattern.search(search_window) or "\nSources:" in search_window or "\nReferences:" in search_window:
+                    # We hit the forbidden section. Stop streaming immediately.
+                    break
+                    
                 yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
                 
+            # Stream is finished. Await the concurrent follow-ups.
+            # Because it ran concurrently, this should take ~0 added seconds.
+            try:
+                related = await follow_up_task
+                if related:
+                    yield f"data: {json.dumps({'type': 'related', 'questions': related})}\n\n"
+            except Exception as e:
+                logger.warning(f"Failed to fetch follow-ups: {e}")
+
             yield "data: {\"type\":\"done\"}\n\n"
             
         except Exception as e:
