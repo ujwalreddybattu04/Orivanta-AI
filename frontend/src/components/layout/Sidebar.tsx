@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Pin, PinOff, MoreHorizontal, Eraser, Trash2, Edit3 } from "lucide-react";
+import { BRAND_NAME, STORAGE_KEYS, EVENTS } from "@/config/constants";
 
 const NAV_ITEMS = [
     {
@@ -57,13 +59,39 @@ export default function Sidebar() {
     const [threads, setThreads] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
 
-    // Read threads from local storage
+    // Thread management state
+    const [pinnedThreadIds, setPinnedThreadIds] = useState<string[]>([]);
+    const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
+    const [editingTitle, setEditingTitle] = useState("");
+    const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+
+    // Read threads and pins from local storage
     const loadThreads = () => {
         if (typeof window !== "undefined") {
             try {
-                const threadsJson = localStorage.getItem("orivanta_threads");
+                // Logic: Prefer Current Brand, Fallback to Legacy for migration
+                let threadsJson = localStorage.getItem(STORAGE_KEYS.THREADS);
+                if (!threadsJson) {
+                    threadsJson = localStorage.getItem("orivanta_threads");
+                    if (threadsJson) {
+                        localStorage.setItem(STORAGE_KEYS.THREADS, threadsJson);
+                    }
+                }
+
                 if (threadsJson) {
                     setThreads(JSON.parse(threadsJson));
+                }
+
+                let pinsJson = localStorage.getItem(STORAGE_KEYS.PINNED_THREADS);
+                if (!pinsJson) {
+                    pinsJson = localStorage.getItem("orivanta_pinned_threads");
+                    if (pinsJson) {
+                        localStorage.setItem(STORAGE_KEYS.PINNED_THREADS, pinsJson);
+                    }
+                }
+
+                if (pinsJson) {
+                    setPinnedThreadIds(JSON.parse(pinsJson));
                 }
             } catch (e) {
                 console.error("Failed to load threads", e);
@@ -73,28 +101,97 @@ export default function Sidebar() {
 
     useEffect(() => {
         loadThreads();
-        window.addEventListener("orivanta_threads_updated", loadThreads);
-        return () => window.removeEventListener("orivanta_threads_updated", loadThreads);
+        window.addEventListener(EVENTS.THREADS_UPDATED, loadThreads);
+
+        // Close menu on click outside
+        const handleClickOutside = () => setActiveMenuId(null);
+        window.addEventListener("click", handleClickOutside);
+
+        return () => {
+            window.removeEventListener(EVENTS.THREADS_UPDATED, loadThreads);
+            window.removeEventListener("click", handleClickOutside);
+        };
     }, []);
 
-    // Inject variable dynamically for the main-content smooth transition
+    // Sync collapsed state with CSS variable for layout consistency
     useEffect(() => {
-        document.documentElement.style.setProperty(
-            '--sidebar-width',
-            isCollapsed ? '72px' : '240px'
-        );
+        if (typeof window !== "undefined") {
+            const width = isCollapsed ? "72px" : "240px";
+            document.documentElement.style.setProperty("--sidebar-width", width);
+        }
     }, [isCollapsed]);
 
-    // Close mobile menu on route change
-    useEffect(() => {
-        setIsMobileOpen(false);
-    }, [pathname]);
+    // Thread Actions
+    const togglePin = (e: React.MouseEvent, id: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const newPins = pinnedThreadIds.includes(id)
+            ? pinnedThreadIds.filter(pid => pid !== id)
+            : [id, ...pinnedThreadIds];
 
-    // Filter threads
-    const filteredThreads = threads.filter(t => {
-        const s = searchQuery.toLowerCase();
-        return (t.title || "").toLowerCase().includes(s) || (t.query || "").toLowerCase().includes(s);
-    });
+        setPinnedThreadIds(newPins);
+        localStorage.setItem(STORAGE_KEYS.PINNED_THREADS, JSON.stringify(newPins));
+        setActiveMenuId(null);
+    };
+
+    const handleDelete = (e: React.MouseEvent, id: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const updatedThreads = threads.filter(t => t.id !== id);
+        setThreads(updatedThreads);
+        localStorage.setItem(STORAGE_KEYS.THREADS, JSON.stringify(updatedThreads));
+
+        // Also remove from pins if present
+        const updatedPins = pinnedThreadIds.filter(pid => pid !== id);
+        setPinnedThreadIds(updatedPins);
+        localStorage.setItem(STORAGE_KEYS.PINNED_THREADS, JSON.stringify(updatedPins));
+
+        window.dispatchEvent(new Event(EVENTS.THREADS_UPDATED));
+        setActiveMenuId(null);
+
+        // If we are on the deleted thread, go home
+        if (activeThreadId === id) {
+            router.push("/");
+        }
+    };
+
+    const startRename = (e: React.MouseEvent, thread: any) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setEditingThreadId(thread.id);
+        setEditingTitle(thread.title || thread.query);
+        setActiveMenuId(null);
+    };
+
+    const saveRename = (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        if (!editingThreadId) return;
+
+        const updatedThreads = threads.map(t =>
+            t.id === editingThreadId ? { ...t, title: editingTitle } : t
+        );
+
+        setThreads(updatedThreads);
+        localStorage.setItem("corten_threads", JSON.stringify(updatedThreads));
+        window.dispatchEvent(new Event("corten_threads_updated"));
+
+        setEditingThreadId(null);
+        setEditingTitle("");
+    };
+
+    // Filter AND Sort (Pins go first)
+    const filteredThreads = threads
+        .filter(t => {
+            const s = searchQuery.toLowerCase();
+            return (t.title || "").toLowerCase().includes(s) || (t.query || "").toLowerCase().includes(s);
+        })
+        .sort((a, b) => {
+            const aPinned = pinnedThreadIds.includes(a.id);
+            const bPinned = pinnedThreadIds.includes(b.id);
+            if (aPinned && !bPinned) return -1;
+            if (!aPinned && bPinned) return 1;
+            return 0; // Maintain relative order for same pin status
+        });
 
     return (
         <>
@@ -123,7 +220,7 @@ export default function Sidebar() {
                             <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
                         </svg>
                     </div>
-                    <span className="sidebar-brand-name">Orivanta</span>
+                    <span className="sidebar-brand-name">Corten</span>
 
                     {/* Mobile Close Button */}
                     <button className="mobile-close-btn" onClick={() => setIsMobileOpen(false)}>
@@ -186,13 +283,72 @@ export default function Sidebar() {
                             </div>
                         ) : (
                             filteredThreads.map((thread) => (
-                                <Link
-                                    key={thread.id}
-                                    href={`/search?q=${encodeURIComponent(thread.query)}&id=${thread.id}`}
-                                    className={`memory-item ${thread.id === activeThreadId ? 'active' : ''}`}
-                                >
-                                    {thread.title || thread.query}
-                                </Link>
+                                <div key={thread.id} className="memory-item-wrapper">
+                                    {editingThreadId === thread.id ? (
+                                        <form className="memory-rename-form" onSubmit={saveRename}>
+                                            <input
+                                                autoFocus
+                                                className="memory-rename-input"
+                                                value={editingTitle}
+                                                onChange={(e) => setEditingTitle(e.target.value)}
+                                                onBlur={() => saveRename()}
+                                                onKeyDown={(e) => e.key === "Escape" && setEditingThreadId(null)}
+                                            />
+                                        </form>
+                                    ) : (
+                                        <Link
+                                            href={`/search?q=${encodeURIComponent(thread.query)}&id=${thread.id}`}
+                                            className={`memory-item ${thread.id === activeThreadId ? 'active' : ''}`}
+                                        >
+                                            <span className="memory-item-text">
+                                                {pinnedThreadIds.includes(thread.id) && (
+                                                    <Pin size={12} className="pin-indicator" fill="currentColor" />
+                                                )}
+                                                {thread.title || thread.query}
+                                            </span>
+
+                                            <div className="memory-item-actions">
+                                                <button
+                                                    className={`more-actions-btn ${activeMenuId === thread.id ? 'active' : ''}`}
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        setActiveMenuId(activeMenuId === thread.id ? null : thread.id);
+                                                    }}
+                                                >
+                                                    <MoreHorizontal size={14} />
+                                                </button>
+                                            </div>
+                                        </Link>
+                                    )}
+
+                                    {activeMenuId === thread.id && (
+                                        <div className="thread-context-menu" onClick={(e) => e.stopPropagation()}>
+                                            <button className="menu-item" onClick={(e) => startRename(e, thread)}>
+                                                <Edit3 size={12} />
+                                                Rename
+                                            </button>
+                                            <button className="menu-item" onClick={(e) => togglePin(e, thread.id)}>
+                                                {pinnedThreadIds.includes(thread.id) ? (
+                                                    <>
+                                                        <PinOff size={12} strokeWidth={2} />
+                                                        Unpin
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Pin size={12} strokeWidth={2} />
+                                                        Pin
+                                                    </>
+                                                )}
+                                            </button>
+                                            <div className="menu-divider" />
+                                            <button className="menu-item delete" onClick={(e) => handleDelete(e, thread.id)}>
+                                                <Trash2 size={12} />
+                                                Delete
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             ))
                         )}
                     </div>

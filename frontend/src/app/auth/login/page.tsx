@@ -3,7 +3,7 @@ export default function LoginPage() {
         <div className="auth-page">
             <div className="auth-card">
                 <h1>Welcome back</h1>
-                <p className="auth-subtitle">Sign in to Orivanta AI</p>
+                <p className="auth-subtitle">Sign in to Corten AI</p>
 
                 <div className="auth-oauth-buttons">
                     <button className="btn-oauth" id="google-login-btn">

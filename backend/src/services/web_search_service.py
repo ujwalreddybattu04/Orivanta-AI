@@ -15,10 +15,10 @@ class TavilySearchService:
         else:
             self.client = AsyncTavilyClient(api_key=self.api_key)
 
-    async def search(self, query: str, max_results: int = 12) -> List[Dict[str, Any]]:
+    async def search(self, query: str, max_results: int = 12) -> Dict[str, Any]:
         """
         Perform a web search using the Tavily API.
-        Returns a list of dictionaries with 'title', 'url', 'content', 'snippet', etc.
+        Returns a list of dictionaries with 'results' (text) and 'images'.
         """
         if not self.client:
             logger.error("Attempted to search without Tavily API key.")
@@ -29,11 +29,16 @@ class TavilySearchService:
             response = await self.client.search(
                 query=query,
                 max_results=max_results,
-                search_depth="basic",
+                search_depth="basic", # Switched back to basic for zero-latency feel
                 include_answer=False,
-                include_images=False,
+                include_images=False, # Disabled: Separate API will be used for images
                 include_raw_content=False,
             )
+            
+            # Robustness check: Ensure response is a dictionary
+            if not isinstance(response, dict):
+                logger.error(f"Unexpected Tavily response type: {type(response)}")
+                return {"results": [], "images": []}
             
             results = []
             for item in response.get("results", []):
@@ -48,13 +53,16 @@ class TavilySearchService:
                     "domain": domain
                 })
                 
-            return results
+            return {
+                "results": results,
+                "images": response.get("images", [])
+            }
         except Exception as e:
             logger.exception(f"Tavily search failed: {e}")
             error_msg = str(e).lower()
             if "usage limit" in error_msg or "429" in error_msg or "exceeds your plan" in error_msg:
                 # Re-raise so orchestrator can inform the user
                 raise Exception("Tavily API usage limit reached. Please check your search provider plan.") from e
-            return []
+            return {"results": [], "images": []}
 
 tavily_search_service = TavilySearchService()

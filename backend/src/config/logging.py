@@ -19,4 +19,4 @@ def setup_logging(level: str = "INFO") -> None:
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 
 
-logger = logging.getLogger("orivanta")
+logger = logging.getLogger("corten")

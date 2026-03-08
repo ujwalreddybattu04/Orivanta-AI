@@ -1,9 +1,11 @@
 import json
 import logging
+from datetime import datetime
 from typing import AsyncGenerator, Dict, Any, List
 
 from groq import AsyncGroq
 from src.config.settings import settings
+from src.config.prompts import RAG_SYSTEM_PROMPT, DIRECT_SYSTEM_PROMPT, PLANNING_SYSTEM_PROMPT, TITLE_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -16,25 +18,27 @@ class GroqLLMService:
         else:
             self.client = AsyncGroq(api_key=self.api_key)
             
-        self.default_model = "llama-3.1-8b-instant"
+        self.default_model = settings.DEFAULT_MODEL
 
     def _build_system_prompt(self, context_results: List[Dict[str, Any]]) -> str:
-        """Constructs the system prompt with context from search results."""
-        prompt = (
-            "You are Orivanta AI, a precise answer engine. Answer based on the provided context.\n"
-            "INSTRUCTIONS:\n"
-            "1. Use inline citations like [1], [2], [3] immediately after the fact.\n"
-            "2. Citations must match the Source numbers below.\n"
-            "3. If unsure, state you don't know.\n"
-            "4. Use Markdown: bold, bullet points, and headers.\n"
-            "5. NO 'References' or bibliography list. ONLY inline citations.\n"
-            "6. Start the answer DIRECTLY.\n\n"
-            "CONTEXT block:\n"
+        """Constructs a dynamic system prompt without hardcoded brand strings."""
+        current_date = datetime.now().strftime("%B %d, %Y")
+
+        if not context_results:
+            return DIRECT_SYSTEM_PROMPT.format(
+                brand_name=settings.BRAND_NAME,
+                company_name=settings.COMPANY_NAME,
+                current_date=current_date
+            )
+
+        prompt = RAG_SYSTEM_PROMPT.format(
+            brand_name=settings.BRAND_NAME,
+            company_name=settings.COMPANY_NAME,
+            current_date=current_date
         )
         
-        # INDUSTRIAL OPTIMIZATION: Limit to top 6 sources for synthesis to minimize TTFT
         for idx, result in enumerate(context_results[:6], start=1):
-            snippet = result.get('snippet', '')[:1000] # trim to 1000 chars
+            snippet = result.get('snippet', '')[:1000]
             prompt += f"Source [{idx}]:\n"
             prompt += f"Title: {result.get('title', 'N/A')}\n"
             prompt += f"Content: {snippet}\n\n"
@@ -86,15 +90,7 @@ class GroqLLMService:
         if not self.client:
             return {"intent": f"Search for {query}", "queries": [query]}
             
-        system_prompt = (
-            "You are a Research Architect. Given a user query, refine it into a single professional "
-            "research intent statement and 3-4 specific, optimized search queries for a web search engine.\n\n"
-            "Output EXACTLY in the following JSON format:\n"
-            "{\n"
-            "  \"intent\": \"A professional, dynamic research objective (e.g., 'Synthesizing market trends for Nvidia...', 'Analyzing historical etymology...', 'Mapping technical specifications...')\",\n"
-            "  \"queries\": [\"sub-query 1\", \"sub-query 2\", \"sub-query 3\"]\n"
-            "}"
-        )
+        system_prompt = PLANNING_SYSTEM_PROMPT
         
         try:
             chat_completion = await self.client.chat.completions.create(
@@ -119,12 +115,7 @@ class GroqLLMService:
         if not self.client:
             return "New Thread"
             
-        system_prompt = (
-            "You are a Title Generator. Based on the user's query, generate a concise, descriptive "
-            "title for an AI chat thread. The title MUST be 2 to 5 words long. "
-            "Do not use quotes, punctuation, or conversational fillers. Examples: "
-            "History of Deep Learning, React Server Components, Python Asyncio Best Practices."
-        )
+        system_prompt = TITLE_SYSTEM_PROMPT
         
         try:
             chat_completion = await self.client.chat.completions.create(

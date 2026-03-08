@@ -1,5 +1,5 @@
 /* =============================================================================
-   Orivanta AI — Premium Research & Thinking UI
+   Corten AI — Premium Research & Thinking UI
    Perplexity-Grade Minimalist Aesthetics — Industry Standard
    ============================================================================= */
 
@@ -336,4 +336,150 @@
 
 .animate-spin {
     animation: spin 1s linear infinite;
+}
+
+/* =========================================================================
+   7. IMAGES TAB - INDUSTRY STANDARD MASONRY
+   ========================================================================= */
+
+.sp-images-tab {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    padding-top: 1rem;
+}
+
+.sp-image-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-auto-rows: 180px;
+    gap: 12px;
+    margin-top: 0.5rem;
+}
+
+.sp-image-card {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    text-decoration: none;
+    background-color: var(--sp-surface-hover);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.sp-image-card:nth-child(even) {
+    grid-row: span 2;
+    /* Creates masonry height variation */
+}
+
+/* Fallback letter styling for broken images */
+.sp-image-card.broken-image {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--sp-surface);
+}
+
+.sp-image-fallback-letter {
+    font-size: 3rem;
+    color: var(--sp-text-secondary);
+    font-weight: 700;
+    opacity: 0.3;
+}
+
+.sp-image-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+    border-color: rgba(255, 255, 255, 0.2);
+    z-index: 2;
+}
+
+.sp-image-wrapper {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #1a1a1a;
+    /* Dark sleek base */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sp-image-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+    opacity: 0;
+    /* JS handles fade in */
+    animation: sp-image-fade-in 0.5s forwards;
+}
+
+@keyframes sp-image-fade-in {
+    to {
+        opacity: 1;
+    }
+}
+
+.sp-image-card:hover .sp-image-wrapper img {
+    transform: scale(1.08);
+    /* Premium slow zoom on hover */
+}
+
+.sp-image-meta {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 1rem 0.75rem 0.5rem;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.4) 50%, transparent 100%);
+    display: flex;
+    align-items: center;
+    transform: translateY(2px);
+    transition: transform 0.2s ease;
+}
+
+.sp-image-card:hover .sp-image-meta {
+    transform: translateY(0);
+}
+
+.sp-image-domain {
+    color: rgba(255, 255, 255, 0.95);
+    font-size: 0.75rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Add a tiny favicon dot before domain */
+.sp-image-domain::before {
+    content: '';
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+}
+
+.sp-images-loading {
+    padding: 3rem 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.sp-no-images {
+    color: var(--sp-text-secondary);
+    font-size: 0.95rem;
+    background-color: var(--sp-surface);
+    padding: 1rem 2rem;
+    border-radius: 20px;
+    border: 1px solid var(--sp-border);
 }

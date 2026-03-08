@@ -206,18 +206,19 @@ export function useSearch(initialQuery: string, focusMode: string = "all", exist
                 })
                     .then(res => res.json())
                     .then(data => {
-                        if (data.title) {
+                        const isPrivate = typeof window !== "undefined" && sessionStorage.getItem("corten_private_mode") === "true";
+                        if (data.title && !isPrivate) {
                             try {
-                                const threadsJson = localStorage.getItem("orivanta_threads");
+                                const threadsJson = localStorage.getItem("corten_threads") || localStorage.getItem("orivanta_threads");
                                 if (threadsJson) {
                                     const threads: ThreadData[] = JSON.parse(threadsJson);
                                     const currentId = threadIdRef.current;
                                     const threadIdx = threads.findIndex(t => t.id === currentId || t.query === q);
                                     if (threadIdx >= 0) {
                                         threads[threadIdx].title = data.title;
-                                        localStorage.setItem("orivanta_threads", JSON.stringify(threads));
+                                        localStorage.setItem("corten_threads", JSON.stringify(threads));
                                         // Trigger a custom event so the Sidebar can re-render immediately
-                                        window.dispatchEvent(new Event("orivanta_threads_updated"));
+                                        window.dispatchEvent(new Event("corten_threads_updated"));
                                     }
                                 }
                             } catch (e) {
@@ -243,44 +244,48 @@ export function useSearch(initialQuery: string, focusMode: string = "all", exist
 
                 // --- LOCAL STORAGE PERSISTENCE ---
                 if (typeof window !== "undefined" && !nextState.error && nextState.answer) {
-                    try {
-                        const threadsJson = localStorage.getItem("orivanta_threads");
-                        let threads: ThreadData[] = threadsJson ? JSON.parse(threadsJson) : [];
+                    let currentThreadId = threadIdRef.current;
+                    if (!currentThreadId) {
+                        currentThreadId = generateThreadId();
+                        threadIdRef.current = currentThreadId;
+                    }
+                    nextState.threadId = currentThreadId; // Attach to state for UI if needed
 
-                        let currentThreadId = threadIdRef.current;
-                        if (!currentThreadId) {
-                            currentThreadId = generateThreadId();
-                            threadIdRef.current = currentThreadId;
+                    const isPrivate = typeof window !== "undefined" && sessionStorage.getItem("corten_private_mode") === "true";
+
+                    if (!isPrivate) {
+                        try {
+                            const threadsJson = localStorage.getItem("corten_threads") || localStorage.getItem("orivanta_threads");
+                            let threads: ThreadData[] = threadsJson ? JSON.parse(threadsJson) : [];
+
+                            const existingIdx = threads.findIndex(t => t.id === currentThreadId);
+
+                            const threadToSave: ThreadData = {
+                                id: currentThreadId,
+                                title: existingIdx >= 0 && threads[existingIdx].title ? threads[existingIdx].title : nextState.query,
+                                createdAt: existingIdx >= 0 ? threads[existingIdx].createdAt : Date.now(),
+                                updatedAt: Date.now(),
+                                query: nextState.query,
+                                history: nextState.history,
+                                answer: nextState.answer,
+                                sources: nextState.sources,
+                                images: nextState.images,
+                                researchSteps: nextState.researchSteps,
+                                thoughtTime: nextState.thoughtTime,
+                            };
+
+                            if (existingIdx >= 0) {
+                                threads[existingIdx] = threadToSave;
+                            } else {
+                                threads.unshift(threadToSave);
+                            }
+
+                            localStorage.setItem("corten_threads", JSON.stringify(threads));
+                            // Dispatch event for Sidebar
+                            window.dispatchEvent(new Event("corten_threads_updated"));
+                        } catch (e) {
+                            console.error("Failed to save thread to localStorage:", e);
                         }
-                        nextState.threadId = currentThreadId; // Attach to state for UI if needed
-
-                        const existingIdx = threads.findIndex(t => t.id === currentThreadId);
-
-                        const threadToSave: ThreadData = {
-                            id: currentThreadId,
-                            title: existingIdx >= 0 && threads[existingIdx].title ? threads[existingIdx].title : nextState.query,
-                            createdAt: existingIdx >= 0 ? threads[existingIdx].createdAt : Date.now(),
-                            updatedAt: Date.now(),
-                            query: nextState.query,
-                            history: nextState.history,
-                            answer: nextState.answer,
-                            sources: nextState.sources,
-                            images: nextState.images,
-                            researchSteps: nextState.researchSteps,
-                            thoughtTime: nextState.thoughtTime,
-                        };
-
-                        if (existingIdx >= 0) {
-                            threads[existingIdx] = threadToSave;
-                        } else {
-                            threads.unshift(threadToSave);
-                        }
-
-                        localStorage.setItem("orivanta_threads", JSON.stringify(threads));
-                        // Dispatch event for Sidebar
-                        window.dispatchEvent(new Event("orivanta_threads_updated"));
-                    } catch (e) {
-                        console.error("Failed to save thread to localStorage:", e);
                     }
                 }
 
@@ -316,33 +321,36 @@ export function useSearch(initialQuery: string, focusMode: string = "all", exist
         // If we are passing an existing threadId, DO NOT run search, hydrate instead
         if (existingThreadId && !hasStarted.current) {
             if (typeof window !== "undefined") {
-                try {
-                    const threadsJson = localStorage.getItem("orivanta_threads");
-                    if (threadsJson) {
-                        const threads: ThreadData[] = JSON.parse(threadsJson);
-                        const thread = threads.find(t => t.id === existingThreadId);
-                        if (thread) {
-                            setState(prev => ({
-                                ...prev,
-                                threadId: thread.id,
-                                history: thread.history,
-                                query: thread.query,
-                                answer: thread.answer,
-                                sources: thread.sources,
-                                images: thread.images,
-                                researchSteps: thread.researchSteps || [],
-                                thoughtTime: thread.thoughtTime || 0,
-                                isConnecting: false,
-                                isStreaming: false
-                            }));
-                            threadIdRef.current = thread.id;
-                            hasStarted.current = true;
-                            lastProcessedQuery.current = thread.query;
-                            return; // Stop here, fully hydrated!
+                const isPrivate = sessionStorage.getItem("corten_private_mode") === "true";
+                if (!isPrivate) {
+                    try {
+                        const threadsJson = localStorage.getItem("corten_threads") || localStorage.getItem("orivanta_threads");
+                        if (threadsJson) {
+                            const threads: ThreadData[] = JSON.parse(threadsJson);
+                            const thread = threads.find(t => t.id === existingThreadId);
+                            if (thread) {
+                                setState(prev => ({
+                                    ...prev,
+                                    threadId: thread.id,
+                                    history: thread.history,
+                                    query: thread.query,
+                                    answer: thread.answer,
+                                    sources: thread.sources,
+                                    images: thread.images,
+                                    researchSteps: thread.researchSteps || [],
+                                    thoughtTime: thread.thoughtTime || 0,
+                                    isConnecting: false,
+                                    isStreaming: false
+                                }));
+                                threadIdRef.current = thread.id;
+                                hasStarted.current = true;
+                                lastProcessedQuery.current = thread.query;
+                                return; // Stop here, fully hydrated!
+                            }
                         }
+                    } catch (e) {
+                        console.error("Failed to hydrate thread:", e);
                     }
-                } catch (e) {
-                    console.error("Failed to hydrate thread:", e);
                 }
             }
         }

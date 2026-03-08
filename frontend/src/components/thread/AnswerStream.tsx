@@ -6,6 +6,15 @@ import remarkGfm from "remark-gfm";
 import type { SearchSource, ResearchStep } from "@/hooks/useSearch";
 import { ResearchProgress } from "./ResearchProgress";
 
+// Premium Formatting Dependencies
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
+
+// Syntax Highlighting
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+
 interface AnswerStreamProps {
     query?: string;
     content: string;
@@ -37,16 +46,25 @@ const AnswerStream = memo(({
     const sourcesPanelOpen = externalSourcesPanelOpen !== undefined ? externalSourcesPanelOpen : localSourcesPanelOpen;
     const setSourcesPanelOpen = externalSetSourcesPanelOpen !== undefined ? externalSetSourcesPanelOpen : setLocalSourcesPanelOpen;
 
-    // Convert generic [1] citations into markdown links [1](1)
-    let processedContent = content.replace(/\[(\d+)\]/g, '[$1]($1)');
+    // 1. Group adjacent citations: [1][2][3] -> [1,2,3](citation:1,2,3)
+    let processedContent = content;
 
-    // Scrubber: Remove any trailing "References:", "Sources:", etc that the LLM might hallucinate
-    // This handles various styles: "References:", "Sources:", "Bibliography:", etc.
+    // Normalize any escaped brackets: \[1\] -> [1]
+    processedContent = processedContent.replace(/\\\[(\d+)\\\]/g, '[$1]');
+
+    // Group adjacent citations, but ONLY if they aren't already part of a markdown link
+    processedContent = processedContent.replace(/((?:\[\d+\])+)(?!\()/g, (match) => {
+        const indices = match.match(/\d+/g)?.join(',') || "";
+        return `[${indices}](citation:${indices})`;
+    });
+
+    // 2. Nuclear Scrubber: Remove any trailing "References:", "Sources:", etc that the LLM might hallucinate
+    // This is aggressive because the UI already has a dedicated sources panel.
     const bibPatterns = [
-        /(?:\n|^)\s*(?:References|Sources|Bibliography|Sources Used):\s*(?:\n|$)/i,
-        /(?:\n|^)\s*#+\s*(?:Sources|References|Bibliography)\s*(?:\n|$)/i,
+        /(?:\n|^)\s*(?:#+\s*)?(?:References?|Sources?|Bibliography|Sources Used):?\s*(?:\n|$)/i,
         /\n\s*1\.\s+[A-Z][a-z]+,.*?\(\d{4}\)/, // Catch standard APA style bibliographies
-        /\n\s*\[1\]\s+http/ // Catch numbered URL lists
+        /\n\s*(?:\[1\]|1\.)\s+http/, // Catch numbered URL lists
+        /\n\s*1,\s*2,\s*3/ // Catch raw csv-style lists at bottom
     ];
 
     for (const pattern of bibPatterns) {
@@ -113,13 +131,60 @@ const AnswerStream = memo(({
             li: ({ children }: any) => (
                 <li className={`answer-list-item${lineClass}`}>{children}</li>
             ),
-            code: ({ children, className }: any) => {
+            code: ({ children, className, node }: any) => {
                 const isBlock = className?.includes("language-");
+                const language = className ? className.replace("language-", "") : "";
+
                 if (isBlock) {
+                    const [copied, setCopied] = useState(false);
+                    const codeString = String(children).replace(/\n$/, "");
+
+                    const copyCode = () => {
+                        navigator.clipboard.writeText(codeString);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                    };
+
+                    const isTerminal = ["bash", "sh", "zsh", "shell", "terminal"].includes(language.toLowerCase());
+                    const containerClass = isTerminal ? "answer-code-block-terminal" : "answer-code-block";
+
                     return (
-                        <pre className={`answer-code-block${lineClass}`}>
-                            <code>{children}</code>
-                        </pre>
+                        <div className={`answer-code-container ${lineClass}`}>
+                            <div className="answer-code-header">
+                                <span className="answer-code-lang">{language || "code"}</span>
+                                <button className="answer-copy-code-btn" onClick={copyCode}>
+                                    {copied ? (
+                                        <div className="answer-copy-code-success">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                            <span>Copied</span>
+                                        </div>
+                                    ) : (
+                                        <div className="answer-copy-code-default">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                                            </svg>
+                                            <span>Copy</span>
+                                        </div>
+                                    )}
+                                </button>
+                            </div>
+                            <SyntaxHighlighter
+                                language={language || "text"}
+                                style={oneDark}
+                                customStyle={{
+                                    margin: 0,
+                                    padding: '16px',
+                                    background: 'transparent',
+                                    fontSize: '0.85rem',
+                                    lineHeight: '1.6',
+                                    borderRadius: '0 0 12px 12px',
+                                }}
+                                wrapLongLines={true}
+                                PreTag="div"
+                            >
+                                {codeString}
+                            </SyntaxHighlighter>
+                        </div>
                     );
                 }
                 return <code className="answer-code-inline">{children}</code>;
@@ -128,24 +193,91 @@ const AnswerStream = memo(({
                 <strong className="answer-bold">{children}</strong>
             ),
             a: ({ href, children }: any) => {
-                if (href && !isNaN(Number(href))) {
-                    const index = parseInt(href, 10);
-                    const realSource = sources[index - 1];
+                const decodedHref = href ? decodeURIComponent(href) : "";
+
+                // Handle Citation Pills: [1,2,3](citation:1,2,3) or legacy formats
+                // We use a robust check that handles spaces potentially added by hallucinating LLMs
+                const isCitation = decodedHref && (
+                    decodedHref.trim().replace(/\s/g, '').startsWith("citation:") ||
+                    decodedHref.trim().replace(/\s/g, '').includes("citation:") ||
+                    decodedHref.trim().replace(/\s/g, '').startsWith("cite:") ||
+                    decodedHref.trim().replace(/\s/g, '').includes("cite:")
+                );
+
+                if (isCitation) {
+                    const normalizedHref = decodedHref.trim().replace(/\s/g, '');
+                    const parts = normalizedHref.split(normalizedHref.includes("citation:") ? "citation:" : "cite:");
+                    const indicesStr = parts[parts.length - 1];
+                    const indices = indicesStr.split(",").map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+
+                    if (indices.length === 0) return <span>{children}</span>;
+
+                    const primaryIdx = indices[0];
+                    const primarySource = sources[primaryIdx - 1];
+                    const extraCount = indices.length - 1;
+
+                    // If we have data for the source, show the professional pill
+                    if (primarySource) {
+                        return (
+                            <a
+                                href={primarySource.url || "#"}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="answer-source-pill"
+                                title={primarySource.title || "View Source"}
+                            >
+                                <span className="source-pill-icon">
+                                    {primarySource.favicon ? (
+                                        <img src={primarySource.favicon} alt="" />
+                                    ) : (
+                                        <span className="source-pill-letter">
+                                            {(primarySource.domain || "S").charAt(0).toUpperCase()}
+                                        </span>
+                                    )}
+                                </span>
+                                <span className="source-pill-name">
+                                    {primarySource.domain || "source"}
+                                </span>
+                                {extraCount > 0 && (
+                                    <span className="source-pill-extra">+{extraCount}</span>
+                                )}
+                            </a>
+                        );
+                    }
+
+                    // Premium Fallback: Small glassmorphic number pill (Billion Dollar style)
                     return (
                         <a
-                            href={realSource?.url || "#"}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="answer-inline-citation"
-                            title={realSource?.title || "Source"}
-                            data-index={index}
+                            href="#"
+                            className="answer-source-pill-mini"
+                            title="Source details loading..."
                         >
-                            {index}
+                            {primaryIdx}{extraCount > 0 ? `+${extraCount}` : ""}
                         </a>
                     );
                 }
                 return <a href={href} className="answer-link" target="_blank" rel="noopener noreferrer">{children}</a>;
             },
+            table: ({ children }: any) => (
+                <div className="answer-table-wrapper">
+                    <table className="answer-table">{children}</table>
+                </div>
+            ),
+            thead: ({ children }: any) => (
+                <thead className="answer-thead">{children}</thead>
+            ),
+            tbody: ({ children }: any) => (
+                <tbody className="answer-tbody">{children}</tbody>
+            ),
+            tr: ({ children }: any) => (
+                <tr className="answer-tr">{children}</tr>
+            ),
+            th: ({ children }: any) => (
+                <th className="answer-th">{children}</th>
+            ),
+            td: ({ children }: any) => (
+                <td className="answer-td">{children}</td>
+            ),
         };
     }, [sources, isStreaming]);
 
@@ -163,7 +295,7 @@ const AnswerStream = memo(({
             />
 
             {/* Answer section — clean render, no layout animations during streaming */}
-            {content.trim().length > 0 && (
+            {(content.trim().length > 0 || isStreaming) && (
                 <div className="answer-container-wrapper">
                     {/* Answer header bar */}
                     <div className="answer-stream-header">
@@ -202,7 +334,8 @@ const AnswerStream = memo(({
                     {/* Answer content — pure CSS transitions, no Framer Motion layout thrashing */}
                     <div className="answer-stream-content">
                         <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
+                            remarkPlugins={[remarkGfm, remarkMath]}
+                            rehypePlugins={[rehypeKatex]}
                             components={markdownComponents}
                         >
                             {processedContent}

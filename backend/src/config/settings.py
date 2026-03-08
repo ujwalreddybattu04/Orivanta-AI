@@ -10,9 +10,12 @@ class Settings(BaseSettings):
     # --- App ---
     APP_ENV: str = "development"
     APP_DEBUG: bool = True
+    BRAND_NAME: str = "Corten"
+    COMPANY_NAME: str = "Calvior Labs"
+    BRAND_DESCRIPTION: str = "the AI assistant by Calvior Labs"
 
     # --- Database ---
-    DATABASE_URL: str = "postgresql+asyncpg://orivanta:orivanta_dev@localhost:5432/orivanta_ai"
+    DATABASE_URL: str = "postgresql+asyncpg://corten:corten_dev@localhost:5432/corten_ai"
 
     # --- Redis ---
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -34,8 +37,13 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
     GOOGLE_AI_API_KEY: str = ""
     GROQ_API_KEY: str = ""
+    
+    # Models
+    DEFAULT_MODEL: str = "llama-3.1-8b-instant"
+    ROUTER_MODEL: str = "llama-3.1-8b-instant"
 
     # --- Web Search ---
+    MAX_SEARCH_RESULTS: int = 10
     BRAVE_SEARCH_API_KEY: str = ""
     GOOGLE_SEARCH_API_KEY: str = ""
     GOOGLE_SEARCH_CX: str = ""

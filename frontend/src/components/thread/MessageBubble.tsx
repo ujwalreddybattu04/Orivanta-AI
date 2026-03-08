@@ -1,4 +1,5 @@
 import type { Source } from "@/types/thread";
+import { BRAND_NAME } from "@/config/constants";
 
 interface MessageBubbleProps {
     role: "user" | "assistant";
@@ -18,7 +19,7 @@ export default function MessageBubble({
     return (
         <div className={`message-bubble message-${role}`}>
             <div className="message-header">
-                <span className="message-role">{role === "user" ? "You" : "Orivanta"}</span>
+                <span className="message-role">{role === "user" ? "You" : BRAND_NAME}</span>
                 {modelUsed && <span className="message-model">{modelUsed}</span>}
                 {timestamp && <span className="message-timestamp">{timestamp}</span>}
             </div>

@@ -1,5 +1,5 @@
 """
-Orivanta AI — FastAPI Application Entry Point
+# Corten AI — FastAPI Application Entry Point
 """
 
 import logging
@@ -13,7 +13,7 @@ from src.core.events import create_start_app_handler, create_stop_app_handler
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="Orivanta AI API",
+    title=f"{settings.BRAND_NAME} AI API",
     description="AI-Powered Answer Engine — Backend API",
     version="0.1.0",
     docs_url="/docs",
@@ -39,7 +39,7 @@ app.add_event_handler("shutdown", create_stop_app_handler(app))
 
 @app.get("/health", tags=["Health"])
 async def health_check():
-    return {"status": "healthy", "service": "orivanta-ai"}
+    return {"status": "healthy", "service": f"{settings.BRAND_NAME.lower()}-ai"}
 
 if __name__ == "__main__":
     import uvicorn

@@ -48,7 +48,7 @@ async def generate_title(request: TitleRequest):
     except Exception as e:
         logger.error(f"Error in title generation: {e}", exc_info=True)
         # Fallback to a generic title rather than failing
-        return {"title": "Orivanta Search"}
+        return {"title": "Corten Search"}
 
 @router.post("/suggestions")
 async def search_suggestions(query: str = ""):

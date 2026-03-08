@@ -1,5 +1,5 @@
 /* =============================================================================
-   Orivanta AI — Sidebar  (Production-Grade v3)
+   Corten AI — Sidebar  (Production-Grade v3)
    ============================================================================= */
 
 /* ── SIDEBAR SHELL ── */
@@ -72,7 +72,8 @@
     gap: 10px;
     padding: 9px 10px;
     border-radius: 8px;
-    color: rgba(255, 255, 255, 0.55);
+    color: rgba(255, 255, 255, 0.9);
+    /* Ultra-Bright Nav Labels */
     font-size: 13.5px;
     font-weight: 400;
     text-decoration: none;
@@ -116,7 +117,8 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    opacity: 0.75;
+    opacity: 1;
+    /* Industrial Brightness - Max pop */
 }
 
 .sidebar-link.active .sidebar-link-icon {
@@ -132,7 +134,8 @@
     white-space: nowrap;
     flex-shrink: 0;
     opacity: 1;
-    transition: opacity 120ms ease;
+    transition: opacity 200ms ease, width 300ms ease, margin 300ms ease;
+    display: inline-block;
 }
 
 /* ── DIVIDER ── */
@@ -151,7 +154,8 @@
     padding: 9px 10px;
     margin: 0 8px;
     border-radius: 8px;
-    color: rgba(255, 255, 255, 0.55);
+    color: rgba(255, 255, 255, 0.9);
+    /* Match Nav Labels */
     font-size: 13.5px;
     font-weight: 400;
     cursor: pointer;
@@ -175,7 +179,8 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    opacity: 0.75;
+    opacity: 1;
+    /* Industrial Brightness - Max pop */
 }
 
 /* ── MEMORY LEDGER ── */
@@ -193,7 +198,8 @@
 .sidebar-section-title {
     font-size: 11px;
     font-weight: 700;
-    color: rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.6);
+    /* Brighter section title */
     text-transform: uppercase;
     letter-spacing: 0.1em;
     margin-bottom: 16px;
@@ -213,7 +219,8 @@
     /* Adjusted to sit inside the input padding */
     top: 50%;
     transform: translateY(-50%);
-    color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.8);
+    /* Vibrant search icon */
 }
 
 .memory-search-input {
@@ -230,7 +237,8 @@
 }
 
 .memory-search-input::placeholder {
-    color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.6);
+    /* Brighter placeholder */
 }
 
 .memory-search-input:focus {
@@ -249,7 +257,8 @@
     border-radius: 9999px;
     font-size: 12px;
     font-weight: 400;
-    color: rgba(255, 255, 255, 0.45);
+    color: rgba(255, 255, 255, 0.7);
+    /* Brighter Filter Labels */
     background: rgba(255, 255, 255, 0.06);
     border: 1px solid transparent;
     cursor: pointer;
@@ -257,8 +266,9 @@
 }
 
 .memory-filter.active {
-    border-color: rgba(255, 255, 255, 0.15);
-    color: rgba(255, 255, 255, 0.85);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: #fff;
+    /* Max Brightness Active */
 }
 
 .memory-filter:hover {
@@ -294,11 +304,17 @@
     background: rgba(255, 255, 255, 0.2);
 }
 
+.memory-item-wrapper {
+    position: relative;
+    width: 100%;
+}
+
 .memory-item {
     padding: 8px 14px;
     /* Reduced vertical padding slightly */
     font-size: 13.5px;
-    color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.85);
+    /* Industrial Brightness - High Pop */
     text-align: left;
     border-radius: 8px;
     cursor: pointer;
@@ -308,11 +324,28 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     width: 100%;
     line-height: 1.4;
     text-decoration: none;
     border-left: 3px solid transparent;
+    flex-shrink: 0;
+}
+
+.memory-item-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pin-indicator {
+    color: rgba(255, 255, 255, 0.85);
+    /* Bright pin indicator */
     flex-shrink: 0;
 }
 
@@ -326,6 +359,116 @@
     color: #fff;
     border-left-color: #fff;
     font-weight: 500;
+}
+
+.memory-item-actions {
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    margin-left: 8px;
+}
+
+.memory-item:hover .memory-item-actions {
+    opacity: 1;
+}
+
+.more-actions-btn {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.4);
+    cursor: pointer;
+    padding: 2px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.more-actions-btn:hover,
+.more-actions-btn.active {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Context Menu */
+.thread-context-menu {
+    position: absolute;
+    top: 100%;
+    right: 12px;
+    z-index: 1000;
+    background: rgba(15, 15, 15, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 6px;
+    min-width: 140px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    animation: menuFadeIn 0.2s ease;
+}
+
+@keyframes menuFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-5px) scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.9);
+    /* Ultra-Bright Menu Labels */
+    font-size: 13px;
+    background: none;
+    border: none;
+    width: 100%;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.menu-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+.menu-item.delete:hover {
+    background: rgba(244, 63, 94, 0.1);
+    color: #fb7185;
+}
+
+.menu-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+    margin: 4px;
+}
+
+/* Rename Interface */
+.memory-rename-form {
+    padding: 4px 12px;
+    width: 100%;
+}
+
+.memory-rename-input {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    padding: 4px 8px;
+    color: #fff;
+    font-size: 13.5px;
+    outline: none;
 }
 
 /* ── FOOTER & COLLAPSE ── */
@@ -345,7 +488,8 @@
     gap: 10px;
     padding: 9px 10px;
     border-radius: 8px;
-    color: rgba(255, 255, 255, 0.55);
+    color: rgba(255, 255, 255, 0.9);
+    /* Match industrial brightness */
     font-size: 13.5px;
     font-weight: 400;
     cursor: pointer;
@@ -380,20 +524,23 @@
     opacity: 0;
     pointer-events: none;
     width: 0;
-    /* removes from flex layout — no ghost space */
-    overflow: hidden;
-    flex-shrink: 1;
+    flex: 0;
     margin: 0;
     padding: 0;
+    overflow: hidden;
+    position: absolute;
+    visibility: hidden;
+    /* ← CRITICAL: kills any ghost artifacts */
 }
 
-/* 2. Hide memory ledger */
+/* 2. Hide memory ledger content but keep as spacer */
 .sidebar.collapsed .sidebar-section {
     opacity: 0;
-    max-height: 0;
-    padding-top: 0;
-    padding-bottom: 0;
+    flex: 1;
     pointer-events: none;
+    overflow: hidden;
+    padding: 0;
+    margin: 0;
 }
 
 /* 3. Hide active bar */
@@ -425,26 +572,24 @@
 .sidebar.collapsed .sidebar-link,
 .sidebar.collapsed .sidebar-collapse-btn {
     justify-content: center;
-    padding: 10px;
-    width: 40px;
-    margin: 0 auto;
+    padding: 10px 0;
+    width: 100%;
+    margin: 0;
     gap: 0;
-    /* ← CRITICAL: removes phantom space from hidden label */
 }
 
 /* 8. New thread centered */
 .sidebar.collapsed .sidebar-new-thread {
     justify-content: center;
-    padding: 10px;
-    width: 40px;
-    margin: 0 auto;
+    padding: 10px 0;
+    width: 100%;
+    margin: 0;
     gap: 0;
-    /* ← CRITICAL: removes phantom space from hidden label */
 }
 
 /* 9. Divider stays visible */
 .sidebar.collapsed .sidebar-divider {
-    margin: 6px 12px;
+    margin: 8px 12px;
 }
 
 /* ── MOBILE ── */

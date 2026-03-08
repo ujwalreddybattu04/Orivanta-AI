@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ChevronDown, Loader2 } from 'lucide-react';
 import { ResearchStep, SearchSource } from '@/hooks/useSearch';
+import { Favicon } from '@/components/common';
 import '../../styles/research.css';
 
 interface ResearchProgressProps {
@@ -113,11 +114,7 @@ export const ResearchProgress: React.FC<ResearchProgressProps> = ({
         headerText = displayTime > 0
             ? `Thought for ${displayTime.toFixed(1)}s`
             : 'Research complete';
-    } else if (latestThought) {
-        headerText = 'Thinking';
-    } else if (querySteps.length > 0) {
-        headerText = 'Thinking';
-    } else if (isStreaming) {
+    } else if (latestThought || querySteps.length > 0 || isStreaming) {
         headerText = 'Thinking';
     }
 
@@ -149,20 +146,20 @@ export const ResearchProgress: React.FC<ResearchProgressProps> = ({
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+                        transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
                         style={{ overflow: 'hidden' }}
                     >
                         <div className="research-content">
 
                             {/* ── Intent (Thought line) ── */}
-                            {latestThought && (
+                            {(latestThought || (isStreaming && steps.length === 0)) && (
                                 <motion.div
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
                                     className="rp-thought-line"
                                 >
                                     <div className="rp-thought-dot" />
-                                    <span>{latestThought.content}</span>
+                                    <span>{latestThought?.content || "Analyzing your query..."}</span>
                                 </motion.div>
                             )}
 
@@ -215,17 +212,7 @@ export const ResearchProgress: React.FC<ResearchProgressProps> = ({
                                                 className="rp-source-row"
                                             >
                                                 <div className="rp-source-favicon">
-                                                    <img
-                                                        src={`https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${source.url}&size=64`}
-                                                        alt=""
-                                                        onError={(e) => {
-                                                            (e.currentTarget as HTMLImageElement).style.display = 'none';
-                                                            const parent = e.currentTarget.parentElement;
-                                                            if (parent) {
-                                                                parent.innerHTML = `<span class="rp-source-favicon-letter">${(source.domain || 'W')[0].toUpperCase()}</span>`;
-                                                            }
-                                                        }}
-                                                    />
+                                                    <Favicon url={source.url} domain={source.domain || ''} size={18} />
                                                 </div>
                                                 <span className="rp-source-title">{source.title}</span>
                                                 <span className="rp-source-domain">{source.domain?.replace(/^www\./, '')}</span>

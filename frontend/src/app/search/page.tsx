@@ -7,6 +7,8 @@ import { useSearch } from "@/hooks/useSearch";
 import AnswerStream from "@/components/thread/AnswerStream";
 import AnswerSkeleton from "@/components/thread/AnswerSkeleton";
 import ImagesGrid from "@/components/thread/ImagesGrid";
+import { Sparkles, Globe, Image as ImageIcon, Pencil, Copy, Check } from "lucide-react";
+import { Favicon } from "@/components/common";
 
 function SearchPageContent() {
     const searchParams = useSearchParams();
@@ -20,6 +22,9 @@ function SearchPageContent() {
     const [activePanelSources, setActivePanelSources] = useState<any[]>([]);
     const [activePanelQuery, setActivePanelQuery] = useState("");
     const [copied, setCopied] = useState(false);
+    const [copiedQueryId, setCopiedQueryId] = useState<string | null>(null);
+    const [editingQueryId, setEditingQueryId] = useState<string | null>(null);
+    const [editingQueryText, setEditingQueryText] = useState("");
 
     const {
         history,
@@ -76,6 +81,32 @@ function SearchPageContent() {
         appendQuery(q);
     }, [appendQuery]);
 
+    const handleCopyQuery = useCallback((queryText: string, queryId: string) => {
+        navigator.clipboard.writeText(queryText);
+        setCopiedQueryId(queryId);
+        setTimeout(() => setCopiedQueryId(null), 2000);
+    }, []);
+
+    const handleStartEdit = useCallback((queryText: string, queryId: string) => {
+        setEditingQueryId(queryId);
+        setEditingQueryText(queryText);
+    }, []);
+
+    const handleCancelEdit = useCallback(() => {
+        setEditingQueryId(null);
+        setEditingQueryText("");
+    }, []);
+
+    const handleSubmitEdit = useCallback((e: React.FormEvent) => {
+        e.preventDefault();
+        const newText = editingQueryText.trim();
+        if (!newText) return;
+        setEditingQueryId(null);
+        setEditingQueryText("");
+        // Navigate to a fresh search with the edited query — this REPLACES the current answer
+        router.push(`/search?q=${encodeURIComponent(newText)}`);
+    }, [editingQueryText, router]);
+
 
 
     const handleCopy = useCallback(() => {
@@ -130,7 +161,7 @@ function SearchPageContent() {
                                 onClick={() => setActiveTab("answer")}
                                 id="tab-answer"
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
+                                <Sparkles size={13} strokeWidth={2.5} />
                                 Answer
                             </button>
                             <button
@@ -141,7 +172,7 @@ function SearchPageContent() {
                                 onClick={() => setActiveTab("links")}
                                 id="tab-links"
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="2" x2="22" y1="12" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>
+                                <Globe size={13} strokeWidth={2.5} />
                                 Links
                             </button>
                             <button
@@ -152,7 +183,7 @@ function SearchPageContent() {
                                 onClick={() => setActiveTab("images")}
                                 id="tab-images"
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="3" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>
+                                <ImageIcon size={13} strokeWidth={2.5} />
                                 Images
                             </button>
                         </div>
@@ -179,7 +210,52 @@ function SearchPageContent() {
                                     {history && history.map((turn, idx) => (
                                         <div key={`history-${idx}`} className="sp-thread-turn">
                                             <div className="sp-query-row">
-                                                <div className="sp-query-bubble">{turn.query}</div>
+                                                <div className="sp-query-bubble-wrap">
+                                                    {editingQueryId === `history-${idx}` ? (
+                                                        <div className="sp-query-edit-container">
+                                                            <textarea
+                                                                autoFocus
+                                                                className="sp-query-edit-textarea"
+                                                                value={editingQueryText}
+                                                                onChange={(e) => setEditingQueryText(e.target.value)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Escape') handleCancelEdit();
+                                                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                                                        e.preventDefault();
+                                                                        handleSubmitEdit(e);
+                                                                    }
+                                                                }}
+                                                                rows={2}
+                                                            />
+                                                            <div className="sp-query-edit-actions">
+                                                                <button type="button" className="sp-query-edit-cancel" onClick={handleCancelEdit}>Cancel</button>
+                                                                <button type="button" className="sp-query-edit-save" onClick={handleSubmitEdit}>Save</button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <div className="sp-query-bubble">{turn.query}</div>
+                                                            <div className="sp-query-actions">
+                                                                <button
+                                                                    className="sp-query-action-btn"
+                                                                    onClick={() => handleStartEdit(turn.query, `history-${idx}`)}
+                                                                    aria-label="Edit query"
+                                                                    title="Edit"
+                                                                >
+                                                                    <Pencil size={13} strokeWidth={2} />
+                                                                </button>
+                                                                <button
+                                                                    className={`sp-query-action-btn ${copiedQueryId === `history-${idx}` ? 'copied' : ''}`}
+                                                                    onClick={() => handleCopyQuery(turn.query, `history-${idx}`)}
+                                                                    aria-label="Copy query"
+                                                                    title="Copy"
+                                                                >
+                                                                    {copiedQueryId === `history-${idx}` ? <Check size={13} strokeWidth={2.5} /> : <Copy size={13} strokeWidth={2} />}
+                                                                </button>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
                                             </div>
                                             <div className="sp-answer-body">
                                                 <AnswerStream
@@ -205,7 +281,52 @@ function SearchPageContent() {
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1.0] }}
                                     >
-                                        <div className="sp-query-bubble">{currentQuery}</div>
+                                        <div className="sp-query-bubble-wrap">
+                                            {editingQueryId === 'current' ? (
+                                                <div className="sp-query-edit-container">
+                                                    <textarea
+                                                        autoFocus
+                                                        className="sp-query-edit-textarea"
+                                                        value={editingQueryText}
+                                                        onChange={(e) => setEditingQueryText(e.target.value)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Escape') handleCancelEdit();
+                                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                                e.preventDefault();
+                                                                handleSubmitEdit(e);
+                                                            }
+                                                        }}
+                                                        rows={2}
+                                                    />
+                                                    <div className="sp-query-edit-actions">
+                                                        <button type="button" className="sp-query-edit-cancel" onClick={handleCancelEdit}>Cancel</button>
+                                                        <button type="button" className="sp-query-edit-save" onClick={handleSubmitEdit}>Save</button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <div className="sp-query-bubble">{currentQuery}</div>
+                                                    <div className="sp-query-actions">
+                                                        <button
+                                                            className="sp-query-action-btn"
+                                                            onClick={() => handleStartEdit(currentQuery, 'current')}
+                                                            aria-label="Edit query"
+                                                            title="Edit"
+                                                        >
+                                                            <Pencil size={13} strokeWidth={2} />
+                                                        </button>
+                                                        <button
+                                                            className={`sp-query-action-btn ${copiedQueryId === 'current' ? 'copied' : ''}`}
+                                                            onClick={() => handleCopyQuery(currentQuery, 'current')}
+                                                            aria-label="Copy query"
+                                                            title="Copy"
+                                                        >
+                                                            {copiedQueryId === 'current' ? <Check size={13} strokeWidth={2.5} /> : <Copy size={13} strokeWidth={2} />}
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
                                     </motion.div>
 
                                     {error && !isLoading && (
@@ -225,9 +346,9 @@ function SearchPageContent() {
                                     {(answer || isStreaming) && (
                                         <motion.div
                                             className="sp-answer-body"
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            transition={{ duration: 0.3, ease: "easeOut" }}
                                         >
                                             <AnswerStream
                                                 query={currentQuery}
@@ -304,19 +425,7 @@ function SearchPageContent() {
                                                         <div className="sp-link-left">
                                                             {/* Favicon circle */}
                                                             <div className="sp-link-favicon">
-                                                                <img
-                                                                    src={`https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${src.url}&size=64`}
-                                                                    alt=""
-                                                                    width={20}
-                                                                    height={20}
-                                                                    onError={(e) => {
-                                                                        (e.currentTarget as HTMLImageElement).style.display = 'none';
-                                                                        const parent = e.currentTarget.parentElement;
-                                                                        if (parent) {
-                                                                            parent.innerHTML = `<span class="sp-link-favicon-letter">${(src.domain || 'W')[0].toUpperCase()}</span>`;
-                                                                        }
-                                                                    }}
-                                                                />
+                                                                <Favicon url={src.url} domain={src.domain || ''} size={20} />
                                                             </div>
                                                             {/* Content block */}
                                                             <div className="sp-link-content">
@@ -339,21 +448,107 @@ function SearchPageContent() {
                             {/* === IMAGES TAB === */}
                             {activeTab === "images" && (
                                 <div className="sp-images-tab">
-                                    {images.length === 0 ? (
-                                        <div className="sp-images-empty-container">
-                                            <div className="sp-empty-tab sp-empty-images-msg">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect width="18" height="18" x="3" y="3" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>
-                                                <p>Images will appear here when the backend is connected.</p>
+                                    {/* History Images */}
+                                    {history && history.map((turn, idx) => (
+                                        turn.images && turn.images.length > 0 && (
+                                            <div key={`history-img-${idx}`} className="sp-thread-turn">
+                                                <div className="sp-query-bubble">{turn.query}</div>
+                                                <div className="sp-image-grid">
+                                                    {turn.images.map((img, i) => (
+                                                        <a key={i} href={img.url} target="_blank" rel="noopener noreferrer" className="sp-image-card">
+                                                            <div className="sp-image-wrapper">
+                                                                <img
+                                                                    src={img.url}
+                                                                    alt={img.alt || "Search result"}
+                                                                    loading="lazy"
+                                                                    onError={(e) => {
+                                                                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                                                        const parent = e.currentTarget.parentElement;
+                                                                        if (parent) {
+                                                                            parent.classList.add('broken-image');
+                                                                            let initial = 'I';
+                                                                            try { initial = new URL(img.url).hostname.replace('www.', '')[0].toUpperCase(); } catch (err) { }
+                                                                            parent.innerHTML = `<span class="sp-image-fallback-letter">${initial}</span>`;
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                            <div className="sp-image-meta">
+                                                                <span className="sp-image-domain">
+                                                                    {(() => {
+                                                                        try { return new URL(img.url).hostname.replace('www.', ''); }
+                                                                        catch (e) { return 'Image'; }
+                                                                    })()}
+                                                                </span>
+                                                            </div>
+                                                        </a>
+                                                    ))}
+                                                </div>
                                             </div>
-                                            <div className="sp-images-skeleton-grid">
-                                                <div className="sp-skeleton-image-box"></div>
-                                                <div className="sp-skeleton-image-box"></div>
-                                                <div className="sp-skeleton-image-box"></div>
-                                                <div className="sp-skeleton-image-box"></div>
+                                        )
+                                    ))}
+
+                                    {/* Current Query Images */}
+                                    {(isConnecting || isStreaming || answer || images.length > 0) && (
+                                        <div className="sp-thread-turn sp-current-turn">
+                                            <div className="sp-query-row" id="current-query-row">
+                                                <div className="sp-query-bubble">{currentQuery}</div>
                                             </div>
+
+                                            {images.length > 0 ? (
+                                                <motion.div
+                                                    className="sp-image-grid"
+                                                    initial={{ opacity: 0, y: 10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    transition={{ duration: 0.4 }}
+                                                >
+                                                    {images.map((img, i) => (
+                                                        <a key={i} href={img.url} target="_blank" rel="noopener noreferrer" className="sp-image-card">
+                                                            <div className="sp-image-wrapper">
+                                                                <img
+                                                                    src={img.url}
+                                                                    alt={img.alt || "Search result"}
+                                                                    loading="lazy"
+                                                                    onError={(e) => {
+                                                                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                                                        const parent = e.currentTarget.parentElement;
+                                                                        if (parent) {
+                                                                            parent.classList.add('broken-image');
+                                                                            let initial = 'I';
+                                                                            try { initial = new URL(img.url).hostname.replace('www.', '')[0].toUpperCase(); } catch (err) { }
+                                                                            parent.innerHTML = `<span class="sp-image-fallback-letter">${initial}</span>`;
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                            <div className="sp-image-meta">
+                                                                <span className="sp-image-domain">
+                                                                    {(() => {
+                                                                        try { return new URL(img.url).hostname.replace('www.', ''); }
+                                                                        catch (e) { return 'Image'; }
+                                                                    })()}
+                                                                </span>
+                                                            </div>
+                                                        </a>
+                                                    ))}
+                                                </motion.div>
+                                            ) : (
+                                                <div className="sp-images-loading">
+                                                    {isStreaming || isConnecting ? (
+                                                        <div className="sp-pulsing-dots">
+                                                            <div className="sp-dot"></div>
+                                                            <div className="sp-dot"></div>
+                                                            <div className="sp-dot"></div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="sp-empty-tab sp-empty-images-msg">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect width="18" height="18" x="3" y="3" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>
+                                                            <p>No images found for this query.</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
-                                    ) : (
-                                        <ImagesGrid images={images} />
                                     )}
                                 </div>
                             )}
@@ -419,17 +614,7 @@ function SearchPageContent() {
                             {activePanelSources.map((src, i) => (
                                 <a key={i} href={src.url} target="_blank" rel="noopener noreferrer" className="sp-source-item" id={`source-item-${i + 1}`}>
                                     <div className="sp-source-item-icon">
-                                        <img
-                                            src={`https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${src.url}&size=64`}
-                                            alt=""
-                                            width={24}
-                                            height={24}
-                                            style={{ borderRadius: "50%" }}
-                                            onError={(e) => {
-                                                (e.currentTarget as any).style.display = 'none';
-                                                (e.currentTarget as any).parentElement.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-globe opacity-40"><circle cx="12" cy="12" r="10"/><path d="M12 2h20"/><path d="M12 2a14.5 14.5 0 0 0 0 20"/><path d="M2 12h20"/></svg>';
-                                            }}
-                                        />
+                                        <Favicon url={src.url} domain={src.domain || ''} size={24} />
                                     </div>
                                     <div className="sp-source-item-body">
                                         <div className="sp-source-item-domain-row">
@@ -460,15 +645,15 @@ function SearchPageSkeleton() {
                     <div className="sp-tabbar">
                         <div className="sp-tabs">
                             <button className="sp-tab sp-tab--active" disabled>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
+                                <Sparkles size={13} strokeWidth={2.5} />
                                 Answer
                             </button>
                             <button className="sp-tab" disabled>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="2" x2="22" y1="12" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>
+                                <Globe size={13} strokeWidth={2.5} />
                                 Links
                             </button>
                             <button className="sp-tab" disabled>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="3" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>
+                                <ImageIcon size={13} strokeWidth={2.5} />
                                 Images
                             </button>
                         </div>

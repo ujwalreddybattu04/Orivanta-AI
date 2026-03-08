@@ -1,5 +1,5 @@
 /* =============================================================================
-   Orivanta AI — Search Answer Page — Perplexity-Style Layout
+   Corten AI — Search Answer Page — Perplexity-Style Layout
    Pure black theme. CSS Grid two-column layout.
    ============================================================================= */
 
@@ -105,6 +105,10 @@ input:focus-visible {
     margin-bottom: -1px;
     border-radius: 0;
     letter-spacing: 0.01em;
+    user-select: none;
+    caret-color: transparent;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .sp-tab svg {
@@ -128,10 +132,12 @@ input:focus-visible {
 .sp-tabbar-right {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+    /* Slightly increased gap for the divider */
     padding: 10px 24px 10px;
 }
 
+/* ─── More / Share Buttons ─── */
 .sp-more-btn {
     width: 30px;
     height: 30px;
@@ -240,18 +246,138 @@ input:focus-visible {
 
 .sp-query-bubble {
     font-size: 0.9rem;
-    /* Balance requested: small but readable */
-    font-weight: 500;
-    color: #ffffff;
-    background: rgba(255, 255, 255, 0.08);
-    /* Sophisticated dark bubble */
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    padding: 8px 16px;
-    border-radius: 20px;
-    max-width: 80%;
-    line-height: 1.4;
+    font-weight: 400;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 10px 18px;
+    border-radius: 18px;
+    line-height: 1.5;
     word-break: break-word;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    border: none;
+    display: inline-block;
+}
+
+/* ── Query Wrapper (preserves right-aligned bubble + actions below) ── */
+.sp-query-bubble-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    max-width: 80%;
+}
+
+/* When editing, expand for spacious Groq-style edit area */
+.sp-query-bubble-wrap:has(.sp-query-edit-container) {
+    max-width: 85%;
+    width: 85%;
+}
+
+/* ── Inline Edit Container (Groq-style) ── */
+.sp-query-edit-container {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 14px 20px 10px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+}
+
+.sp-query-edit-textarea {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: #ffffff;
+    font-size: 0.95rem;
+    font-weight: 400;
+    font-family: inherit;
+    line-height: 1.55;
+    resize: none;
+    outline: none;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.sp-query-edit-textarea::placeholder {
+    color: rgba(255, 255, 255, 0.3);
+}
+
+.sp-query-edit-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.sp-query-edit-cancel {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 7px 16px;
+    border-radius: 8px;
+    transition: color 0.15s ease, background 0.15s ease;
+}
+
+.sp-query-edit-cancel:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.sp-query-edit-save {
+    background: #fff;
+    border: none;
+    color: #000;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 7px 22px;
+    border-radius: 20px;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.sp-query-edit-save:hover {
+    opacity: 0.88;
+    transform: scale(1.02);
+}
+
+/* ── Query Action Buttons (Edit & Copy) ── */
+.sp-query-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-top: 4px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.sp-query-row:hover .sp-query-actions {
+    opacity: 1;
+}
+
+.sp-query-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: none;
+    color: rgba(255, 255, 255, 0.35);
+    cursor: pointer;
+    border-radius: 6px;
+    transition: color 0.15s ease, background 0.15s ease;
+    padding: 0;
+}
+
+.sp-query-action-btn:hover {
+    color: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.sp-query-action-btn.copied {
+    color: #4ade80;
 }
 
 /* ══════════════════════════════════════
@@ -277,13 +403,10 @@ input:focus-visible {
    ══════════════════════════════════════ */
 
 .sp-answer-body {
-    color: rgba(255, 255, 255, 0.88);
-    font-size: 1rem;
-    line-height: 1.75;
-    margin-bottom: 8px;
-    width: 100%;
+    color: rgba(255, 255, 255, 0.85);
     max-width: 90%;
-    /* Perplexity doesn't let text touch the far right edge */
+    font-weight: 500;
+    /* Soft premium high-fidelity text */
 }
 
 /* Override AnswerStream card styling — answer flows as plain text */
@@ -301,13 +424,15 @@ input:focus-visible {
     padding: 0;
     line-height: 1.75;
     font-size: 1rem;
-    color: rgba(255, 255, 255, 0.88);
+    color: #ffffff;
 }
 
 /* Paragraph */
 .answer-paragraph {
     margin: 0 0 14px;
     line-height: 1.75;
+    color: rgba(255, 255, 255, 0.85);
+    font-weight: 500;
 }
 
 .answer-paragraph:last-child {
@@ -316,20 +441,20 @@ input:focus-visible {
 
 /* Headings in answer */
 .answer-h2 {
-    font-size: 1.05rem;
+    font-size: 1.15rem;
     font-weight: 700;
     color: #ffffff;
-    margin: 22px 0 10px;
+    margin: 32px 0 12px;
     padding: 0;
     border: none;
-    letter-spacing: -0.015em;
+    letter-spacing: -0.02em;
 }
 
 .answer-h3 {
-    font-size: 0.975rem;
+    font-size: 1rem;
     font-weight: 600;
     color: #ffffff;
-    margin: 18px 0 8px;
+    margin: 24px 0 10px;
     letter-spacing: -0.01em;
 }
 
@@ -346,7 +471,8 @@ input:focus-visible {
 .answer-list-item {
     margin-bottom: 8px;
     line-height: 1.7;
-    color: rgba(255, 255, 255, 0.84);
+    color: rgba(255, 255, 255, 0.85);
+    font-weight: 500;
 }
 
 .answer-list-item:last-child {
@@ -354,7 +480,7 @@ input:focus-visible {
 }
 
 .answer-bold {
-    font-weight: 600;
+    font-weight: 700;
     color: #ffffff;
 }
 
@@ -379,15 +505,177 @@ input:focus-visible {
 }
 
 .answer-code-block {
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(255, 255, 255, 0.035);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 10px;
+    border-radius: 0 0 10px 10px;
     padding: 16px;
-    margin: 14px 0;
+    margin: 0;
     overflow-x: auto;
-    font-family: "Fira Code", "Consolas", monospace;
+    font-family: "Fira Code", "JetBrains Mono", "Consolas", monospace;
     font-size: 0.875rem;
     line-height: 1.6;
+}
+
+/* ── Terminal Style (bash/sh) ── */
+.answer-code-block-terminal {
+    background: #0d0d0d;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+    padding: 16px;
+    margin: 0;
+    overflow-x: auto;
+    font-family: "Fira Code", "JetBrains Mono", "Consolas", monospace;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: #e0e0e0;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.answer-code-container {
+    margin: 18px 0;
+    width: 100%;
+    max-width: 100%;
+}
+
+/* ── Remove typography.css code backgrounds for syntax highlighted blocks ── */
+.answer-code-container code,
+.answer-code-container span {
+    background: transparent !important;
+}
+
+.answer-code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 7px 14px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: none;
+    border-radius: 10px 10px 0 0;
+}
+
+.answer-code-lang {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.45);
+    letter-spacing: 0.05em;
+    font-family: inherit;
+}
+
+.answer-copy-code-btn {
+    display: flex;
+    align-items: center;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.4);
+    cursor: pointer;
+    transition: color 0.15s ease;
+    padding: 0;
+}
+
+.answer-copy-code-btn:hover {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+/* ══════════════════════════════════════
+   GLASSMORPHIC INDUSTRIAL TABLES
+   ══════════════════════════════════════ */
+
+.answer-table-wrapper {
+    margin: 20px 0;
+    width: 100%;
+    overflow-x: auto;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    /* Glassmorphism */
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.answer-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9375rem;
+    text-align: left;
+}
+
+.answer-th {
+    padding: 12px 16px;
+    font-weight: 700;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+    white-space: nowrap;
+}
+
+.answer-td {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.85);
+    font-weight: 500;
+    vertical-align: middle;
+}
+
+.answer-tr:last-child .answer-td {
+    border-bottom: none;
+}
+
+/* Zebra Striping for scannability */
+.answer-tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.012);
+}
+
+.answer-tr:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+/* Right-align numbers (Billion Dollar Financial Standard) */
+.answer-td:nth-of-type(n+2),
+.answer-th:nth-of-type(n+2) {
+    text-align: right;
+}
+
+/* Keep first column left-aligned and bold for comparison 'Features' */
+.answer-td:first-child,
+.answer-th:first-child {
+    text-align: left;
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.answer-copy-code-default,
+.answer-copy-code-success {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.answer-copy-code-default span,
+.answer-copy-code-success span {
+    font-size: 0.72rem;
+    font-weight: 500;
+}
+
+.answer-copy-code-success {
+    color: #10b981;
+}
+
+/* ── KaTeX Mathematical Typeset Tweaks ── */
+.katex-display {
+    margin: 1.2em 0 !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 10px 0;
+    scrollbar-width: none;
+}
+
+.katex-display::-webkit-scrollbar {
+    display: none;
+}
+
+.katex {
+    font-size: 1.05em !important;
 }
 
 /* ── Citation pills — inline Perplexity-style domain pills ── */
@@ -1631,32 +1919,109 @@ input:focus-visible {
 }
 
 /* ══════════════════════════════════════
-   INLINE CITATION ICONS (Superscript)
+   INLINE SOURCE PILLS (Perplexity Style)
    ══════════════════════════════════════ */
 
-.answer-inline-citation {
+.answer-source-pill {
     display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px 2px 4px;
+    margin: 0 4px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    /* Premium Glassmorphism */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    text-decoration: none;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    vertical-align: middle;
+    cursor: pointer;
+    position: relative;
+    top: -1px;
+    /* Slight optical adjustment */
+}
+
+.answer-source-pill:hover {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.source-pill-icon {
+    display: flex;
     align-items: center;
     justify-content: center;
     width: 14px;
     height: 14px;
+    border-radius: 2px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.source-pill-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.source-pill-letter {
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.source-pill-name {
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.85);
+    max-width: 120px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.source-pill-extra {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.5);
+    margin-left: -2px;
+}
+
+/* Premium Fallback for Citations (Billion Dollar style) */
+.answer-source-pill-mini {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 5px;
     border-radius: 4px;
     background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.9);
-    font-size: 0.6rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.68rem;
     font-weight: 700;
     text-decoration: none;
     margin: 0 2px;
-    position: relative;
-    top: -4px;
-    transition: all 0.2s ease;
+    vertical-align: super;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     cursor: pointer;
-    vertical-align: baseline;
 }
 
-.answer-inline-citation:hover {
+.answer-source-pill-mini:hover {
     background: rgba(255, 255, 255, 0.2);
     transform: translateY(-1px);
+}
+
+.answer-link {
+    color: #ffffff;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    transition: border-color 0.2s;
+}
+
+.answer-link:hover {
+    border-bottom-color: rgba(255, 255, 255, 0.4);
 }
 
 /* ══════════════════════════════════════

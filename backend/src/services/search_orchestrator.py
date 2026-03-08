@@ -5,6 +5,8 @@ from typing import AsyncGenerator
 
 from src.services.web_search_service import tavily_search_service
 from src.services.llm_service import groq_llm_service
+from src.services.query_router import query_router
+from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -27,38 +29,53 @@ class SearchOrchestrator:
             start_time = time.time()
             logger.info(f"Orchestrating search for: {query} with focus: {focus_mode}")
             
-            # --- PHASE 0: INSTANT FEEDBACK (<50ms) ---
-            yield f"data: {json.dumps({'type': 'status', 'content': 'Analyzing query'})}\n\n"
-            
-            # Speculative Intent: Mask the initial thinking gap
-            # This is a key "Billion Dollar" optimization — never show a dead screen
-            await asyncio.sleep(0.02) 
-            
-            # --- PHASE 1: PARALLEL EXECUTION ---
-            # Fire search + plan concurrently
+            # --- PHASE 0: SPECULATIVE LAUNCH ---
+            route_task = asyncio.create_task(query_router.route_query(query))
+            # Fetch a few extra to ensure we can satisfy the 10-result requirement if some are filtered
+            search_task = asyncio.create_task(tavily_search_service.search(query, max_results=settings.MAX_SEARCH_RESULTS + 2))
             plan_task = asyncio.create_task(groq_llm_service.generate_research_plan(query))
-            search_task = asyncio.create_task(tavily_search_service.search(query, max_results=12))
+            
+            yield f"data: {json.dumps({'type': 'status', 'content': 'Analyzing query...'})}\n\n"
+            
+            # --- PHASE 1: AWAIT ROUTING DECISION ---
+            route = await route_task
+            intent = "SEARCH"
+            if isinstance(route, dict):
+                intent = route.get("intent", "SEARCH")
+            
+            if intent in ["IDENTITY", "DIRECT"]:
+                 logger.info(f"Optimization: Intent is {intent}. Switching to direct path.")
+                 search_task.cancel()
+                 plan_task.cancel()
+                 
+                 thought_time = time.time() - start_time
+                 yield f"data: {json.dumps({'type': 'thought_time', 'time': round(thought_time, 1)})}\n\n"
+                 
+                 async for chunk in groq_llm_service.stream_answer(query, [], messages):
+                     yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
+                 
+                 yield "data: {\"type\":\"done\"}\n\n"
+                 return
 
-            # BUG FIX / OPTIMIZATION: Do NOT await search_task here.
-            # Await the plan first because it's usually faster (~300-500ms) 
-            # and allows us to fill the UI with "Research Steps" while search (~1-2s) runs.
-            
-            plan = await plan_task
-            refined_intent = plan.get("intent")
-            if refined_intent:
-                yield f"data: {json.dumps({'type': 'thought', 'content': refined_intent})}\n\n"
-            
-            sub_queries = plan.get("queries", [query])
-            for sq in sub_queries:
-                yield f"data: {json.dumps({'type': 'query_step', 'content': sq})}\n\n"
-                # Visual pop timing
-                await asyncio.sleep(0.05)
+            # --- PHASE 2: INSTANT FEEDBACK ---
+            # Yield the first pill IMMEDIATELY. Zero wait for plan/search.
+            yield f"data: {json.dumps({'type': 'query_step', 'content': query})}\n\n"
+            yield f"data: {json.dumps({'type': 'status', 'content': 'Searching the web'})}\n\n"
 
-            # --- PHASE 2: SYNC SEARCH RESULTS ---
-            search_results = await search_task
-            logger.info(f"Search results received: {len(search_results)} items")
+            # --- PHASE 3: SYNC SEARCH RESULTS (PRIORITY) ---
+            # Wait for search results first! They are the core of the answer.
+            search_data = await search_task
             
-            # Format sources for frontend
+            # Defensive check
+            if not isinstance(search_data, dict):
+                search_results = []
+                images = []
+            else:
+                # Strictly enforce the configured limit
+                search_results = search_data.get("results", [])[:settings.MAX_SEARCH_RESULTS]
+                images = search_data.get("images", [])
+            
+            # Format and yield sources immediately
             frontend_sources = []
             for idx, res in enumerate(search_results, start=1):
                 domain = res.get("domain", "website")
@@ -71,16 +88,33 @@ class SearchOrchestrator:
                     "citationIndex": idx
                 })
             
-            # Yield sources as soon as they are ready for the Analysis Bar
             yield f"data: {json.dumps({'type': 'sources', 'sources': frontend_sources, 'items': frontend_sources})}\n\n"
+            if images:
+                yield f"data: {json.dumps({'type': 'images', 'images': images})}\n\n"
             
-            # --- PHASE 3: START LLM STREAM ---
+            # --- PHASE 4: LAYER IN PLAN (If available) ---
+            # Await the plan now. If it's done, we show extra pills.
+            # If it's slow, we don't hold up the LLM stream any longer.
+            try:
+                # Give the plan a few more ms to finish if it hasn't, but don't block heavily
+                plan = await asyncio.wait_for(plan_task, timeout=0.5)
+                refined_intent = plan.get("intent")
+                if refined_intent:
+                    yield f"data: {json.dumps({'type': 'thought', 'content': refined_intent})}\n\n"
+                
+                sub_queries = plan.get("queries", [query])
+                # Skip the first query if it's the same as our instant pill
+                for sq in sub_queries:
+                    if sq.lower().strip("?") != query.lower().strip("?"):
+                        yield f"data: {json.dumps({'type': 'query_step', 'content': sq})}\n\n"
+            except Exception:
+                logger.warning("Research plan timed out or failed, proceeding with primary search")
+            
+            # --- PHASE 5: START LLM STREAM ---
             thought_time = time.time() - start_time
             yield f"data: {json.dumps({'type': 'thought_time', 'time': round(thought_time, 1)})}\n\n"
-            
-            yield f"data: {json.dumps({'type': 'status', 'content': 'Synthesizing response'})}\n\n"
+            yield f"data: {json.dumps({'type': 'status', 'content': 'Thinking'})}\n\n"
 
-            # Stream LLM answer directly
             async for chunk in groq_llm_service.stream_answer(query, search_results, messages):
                 yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
                 

@@ -7,17 +7,18 @@ import "@/styles/sidebar.css";
 import "@/styles/searchbar.css";
 import "@/styles/home.css";
 import "@/styles/thread.css";
+import "@/styles/components/PrivateToggle.css";
 import { Sidebar } from "@/components/layout";
+import { SITE_TITLE, SITE_DESCRIPTION } from "@/config/constants";
 
 export const metadata: Metadata = {
-    title: "Orivanta AI — AI-Powered Answer Engine",
-    description:
-        "Search smarter with Orivanta AI. Get direct, cited answers powered by advanced AI models.",
+    title: `${SITE_TITLE} — AI-Powered Answer Engine`,
+    description: SITE_DESCRIPTION,
     openGraph: {
-        title: "Orivanta AI",
+        title: SITE_TITLE,
         description: "AI-Powered Answer Engine",
-        url: "https://orivanta.ai",
-        siteName: "Orivanta AI",
+        url: "https://corten.ai",
+        siteName: SITE_TITLE,
         type: "website",
     },
 };

@@ -3,7 +3,7 @@ export default function SignupPage() {
         <div className="auth-page">
             <div className="auth-card">
                 <h1>Create your account</h1>
-                <p className="auth-subtitle">Join Orivanta AI</p>
+                <p className="auth-subtitle">Join Corten AI</p>
 
                 <div className="auth-oauth-buttons">
                     <button className="btn-oauth" id="google-signup-btn">
