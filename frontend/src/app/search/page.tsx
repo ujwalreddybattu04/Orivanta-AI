@@ -209,7 +209,48 @@ function SearchPageContent() {
                                         >
                                             <div className="sp-query-row">
                                                 <div className="sp-query-bubble-wrap">
-                                                    <div className="sp-query-bubble">{turn.query}</div>
+                                                    {editingQueryId === `history-${idx}` ? (
+                                                        <div className="sp-query-edit-container">
+                                                            <textarea
+                                                                autoFocus
+                                                                className="sp-query-edit-textarea"
+                                                                value={editingQueryText}
+                                                                onChange={(e) => setEditingQueryText(e.target.value)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Escape') handleCancelEdit();
+                                                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                                                        e.preventDefault();
+                                                                        handleSubmitEdit(e);
+                                                                    }
+                                                                }}
+                                                                rows={2}
+                                                            />
+                                                            <div className="sp-query-edit-actions">
+                                                                <button type="button" className="sp-query-edit-cancel" onClick={handleCancelEdit}>Cancel</button>
+                                                                <button type="button" className="sp-query-edit-save" onClick={handleSubmitEdit}>Save</button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <div className="sp-query-bubble">{turn.query}</div>
+                                                            <div className="sp-query-actions">
+                                                                <button
+                                                                    className="sp-query-action-btn"
+                                                                    onClick={() => handleStartEdit(turn.query, `history-${idx}`)}
+                                                                    title="Edit"
+                                                                >
+                                                                    <Pencil size={13} strokeWidth={2} />
+                                                                </button>
+                                                                <button
+                                                                    className={`sp-query-action-btn ${copiedQueryId === `history-${idx}` ? 'copied' : ''}`}
+                                                                    onClick={() => handleCopyQuery(turn.query, `history-${idx}`)}
+                                                                    title="Copy"
+                                                                >
+                                                                    {copiedQueryId === `history-${idx}` ? <Check size={13} strokeWidth={2.5} /> : <Copy size={13} strokeWidth={2} />}
+                                                                </button>
+                                                            </div>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
                                             <div className="sp-answer-body">
@@ -220,12 +261,14 @@ function SearchPageContent() {
                                                     sources={turn.sources}
                                                     researchSteps={turn.researchSteps}
                                                     thoughtTime={turn.thoughtTime}
-                                                    onCopy={handleCopy}
+                                                    onCopy={() => {
+                                                        setCopied(true);
+                                                        setTimeout(() => setCopied(false), 2000);
+                                                    }}
                                                     sourcesPanelOpen={sourcesPanelOpen && activePanelQuery === turn.query}
                                                     setSourcesPanelOpen={(o) => toggleSourcesPanel(o, turn.sources, turn.query)}
                                                 />
                                             </div>
-                                            <div className="sp-turn-divider" />
                                         </motion.div>
                                     ))}
 
@@ -417,11 +460,7 @@ function SearchPageContent() {
                                     ? `${activePanelSources.length} sources`
                                     : "Sources"}
                             </h3>
-                            {activePanelQuery && (
-                                <p className="sp-sources-panel-subtitle">
-                                    Sources for {activePanelQuery}
-                                </p>
-                            )}
+
                         </div>
                         <button
                             className="sp-sources-panel-close"
@@ -441,18 +480,18 @@ function SearchPageContent() {
                                     rel="noopener noreferrer"
                                     className="sp-source-item"
                                 >
-                                    <div className="sp-source-item-icon">
-                                        <Favicon url={src.url} domain={src.domain || ''} size={20} />
-                                    </div>
-                                    <div className="sp-source-item-body">
+                                    <div className="sp-source-item-top">
+                                        <div className="sp-source-item-icon">
+                                            <Favicon url={src.url} domain={src.domain || ''} size={16} />
+                                        </div>
                                         <div className="sp-source-item-domain">
                                             {(src.domain || '').replace(/^www\./, '')}
                                         </div>
-                                        <div className="sp-source-item-title">{src.title}</div>
-                                        {src.snippet && (
-                                            <div className="sp-source-item-snippet">{src.snippet}</div>
-                                        )}
                                     </div>
+                                    <div className="sp-source-item-title">{src.title}</div>
+                                    {src.snippet && (
+                                        <div className="sp-source-item-snippet">{src.snippet}</div>
+                                    )}
                                 </a>
                             ))}
                         </div>

@@ -51,37 +51,28 @@ const AnswerStream = memo(({
     const sourcesPanelOpen = externalSourcesPanelOpen !== undefined ? externalSourcesPanelOpen : localSourcesPanelOpen;
     const setSourcesPanelOpen = externalSetSourcesPanelOpen !== undefined ? externalSetSourcesPanelOpen : setLocalSourcesPanelOpen;
 
-    // 1. Group adjacent citations: [1][2][3] -> [1,2,3](citation:1,2,3)
+    // 1. Industry-Lead Citation Stripping: Aggressively remove [n], [n,m], etc.
+    // We prioritize keeping markdown structure (newlines, headers, tables) intact.
     let processedContent = content;
 
-    // Normalize any escaped brackets: \[1\] -> [1]
-    processedContent = processedContent.replace(/\\\[(\d+)\\\]/g, '[$1]');
+    // Remove brackets and potential trailing markdown link: [1], [1, 2], [1](citation:1), etc.
+    processedContent = processedContent.replace(/\\?\[\s*[\d,\s]+\s*\\?\](?:\([^\)]+\))?/g, '');
 
-    // Normalize AI hallucinations: **1** -> [1], ^1^ -> [1], [ 1 ] -> [1]
-    processedContent = processedContent.replace(/\*\*(\d+)\*\*/g, '[$1]');
-    processedContent = processedContent.replace(/\^(\d+)\^/g, '[$1]');
-    processedContent = processedContent.replace(/\[\s*(\d+)\s*\]/g, '[$1]');
+    // Remove hallucinated bold/superscript numbers: **1**, ^1^, etc.
+    processedContent = processedContent.replace(/\*\*(\d+)\*\*/g, '');
+    processedContent = processedContent.replace(/\^(\d+)\^/g, '');
 
-    // Normalize plain numbers hallucinated at the end of sentences (e.g., "word 1. ")
-    processedContent = processedContent.replace(/([a-zA-Z])\s+(\d+)([\.,])(?=\s|$)/g, (match, letter, num, punc) => {
-        const sourceIdx = parseInt(num, 10);
-        if (sourceIdx >= 1 && sourceIdx <= sources.length) {
-            return `${letter} [${num}]${punc}`;
-        }
-        return match; // Ignore if it's not a valid source range (avoids false positives like "Top 5.")
-    });
+    // High-Precision Terminal Number Removal: Remove numbers like " word 11." but NOT "258.85"
+    // We only target 1-3 digits that are at the very end of a word followed by punctuation or space.
+    // We use a non-greedy approach that avoids matching decimals or years within sentences.
+    processedContent = processedContent.replace(/([a-zA-Z])\s+(\d{1,2})([\.,])(?=\s|$)/g, '$1$3');
 
-    // Normalize comma-separated citations: [1, 2, 3] -> [1][2][3]
-    processedContent = processedContent.replace(/\[([0-9,\s]+)\]/g, (match, inner) => {
-        const nums = inner.split(',').map((n: string) => n.trim()).filter((n: string) => n);
-        return nums.map((n: string) => `[${n}]`).join('');
-    });
+    // DO NOT flattend double spaces globally as it breaks Markdown structure (tables, etc.)
+    // Instead, just clean up spaces after we stripped brackets
+    processedContent = processedContent.replace(/ +(?= )/g, '');
 
-    // Group adjacent citations (even if there are spaces between them), but ONLY if they aren't already part of a markdown link
-    processedContent = processedContent.replace(/((?:\[\d+\]\s*)+)(?!\()/g, (match) => {
-        const indices = match.match(/\d+/g)?.join(',') || "";
-        return `[${indices}](citation:${indices})`;
-    });
+    // Normalize any weird remaining bib fragments if streaming (prevent flicker)
+    processedContent = processedContent.trim();
 
     // 2. Nuclear Scrubber: Remove any trailing "References:", "Sources:", etc that the LLM might hallucinate
     // This is aggressive because the UI already has a dedicated sources panel.
@@ -252,55 +243,10 @@ const AnswerStream = memo(({
                     }
                 }
 
-                // If it's any form of citation (explicit or hallucinated markdown link), render the Pillar!
+                // If it's any form of citation (explicit or hallucinated markdown link), render nothing!
+                // User requested to remove inline citations completely as they are redundant with the Sources button.
                 if (isExplicitCitationURL || isMarkdownLinkCitation) {
-                    if (citationIndices.length === 0) return <span>{children}</span>;
-
-                    const primaryIdx = citationIndices[0];
-                    const primarySource = sources[primaryIdx - 1];
-                    const extraCount = citationIndices.length - 1;
-
-                    // If we have data for the source, show the professional pill
-                    if (primarySource) {
-                        return (
-                            <a
-                                href={primarySource.url || "#"}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="answer-source-pill"
-                                title={primarySource.title || "View Source"}
-                            >
-                                <span className="source-pill-icon">
-                                    {primarySource.favicon ? (
-                                        <img src={primarySource.favicon} alt="" />
-                                    ) : (
-                                        <span className="source-pill-letter">
-                                            {(primarySource.domain || "S").charAt(0).toUpperCase()}
-                                        </span>
-                                    )}
-                                </span>
-                                <span className="source-pill-name">
-                                    {primarySource.domain || "source"}
-                                </span>
-                                {extraCount > 0 && (
-                                    <span className="source-pill-extra">+{extraCount}</span>
-                                )}
-                            </a>
-                        );
-                    }
-
-                    // Premium Fallback: Small glassmorphic number pill (Billion Dollar style)
-                    return (
-                        <a
-                            href={decodedHref.startsWith('http') ? decodedHref : "#"}
-                            className="answer-source-pill-mini"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="View Source"
-                        >
-                            {primaryIdx}{extraCount > 0 ? `+${extraCount}` : ""}
-                        </a>
-                    );
+                    return <></>;
                 }
 
                 // Standard text hyperlink
@@ -399,23 +345,7 @@ const AnswerStream = memo(({
                     {(content.trim().length > 0 || sources.length > 0) && !isStreaming && (
                         <div className="sp-action-row">
                             <div className="sp-action-left">
-                                <button className="sp-icon-btn" onClick={handleCopy} title={localCopied ? "Copied!" : "Copy"}>
-                                    {localCopied ? (
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12" /></svg>
-                                    ) : (
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 2 8 6" /><line x1="12" x2="12" y1="2" y2="15" /></svg>
-                                    )}
-                                </button>
-                                <button className="sp-icon-btn" title="Download">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
-                                </button>
-                                <button className="sp-icon-btn" title="Copy text">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="14" height="14" x="8" y="8" rx="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
-                                </button>
-                                <button className="sp-icon-btn" title="Reload">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /></svg>
-                                </button>
-                                {/* Sources action button */}
+                                {/* Sources action button - Now first on the left! */}
                                 {sources.length > 0 && (
                                     <button
                                         className={`sp-sources-action-btn ${sourcesPanelOpen ? "active" : ""}`}
@@ -444,16 +374,27 @@ const AnswerStream = memo(({
                                         </span>
                                     </button>
                                 )}
+                                <div className="sp-action-divider" />
+                                <button className="sp-icon-btn" onClick={handleCopy} title={localCopied ? "Copied!" : "Copy"}>
+                                    {localCopied ? (
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                                    ) : (
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
+                                    )}
+                                </button>
+                                <button className="sp-icon-btn" title="Reload">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /></svg>
+                                </button>
                             </div>
                             <div className="sp-action-right">
                                 <button className="sp-icon-btn" title="Thumbs up">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 10v12" /><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" /></svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M7 10v12" /><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" /></svg>
                                 </button>
                                 <button className="sp-icon-btn" title="Thumbs down">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 14V2" /><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z" /></svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17 14V2" /><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z" /></svg>
                                 </button>
                                 <button className="sp-icon-btn" title="More">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" /></svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /><circle cx="5" cy="12" r="1.5" /></svg>
                                 </button>
                             </div>
                         </div>
