@@ -89,7 +89,8 @@ const AnswerStream = memo(({
         /(?:\n|^)\s*(?:#+\s*)?(?:References?|Sources?|Bibliography|Sources Used):?\s*(?:\n|$)/i,
         /\n\s*1\.\s+[A-Z][a-z]+,.*?\(\d{4}\)/, // Catch standard APA style bibliographies
         /\n\s*(?:\[1\]|1\.)\s+http/, // Catch numbered URL lists
-        /\n\s*1,\s*2,\s*3/ // Catch raw csv-style lists at bottom
+        /\n\s*1,\s*2,\s*3/, // Catch raw csv-style lists at bottom
+        /(?:\n|^)(?:\[[^\]]+\]\(https?:\/\/[^\s\)]+\)\s*){2,}/ // Aggressive: 2+ links in a row = list
     ];
 
     for (const pattern of bibPatterns) {

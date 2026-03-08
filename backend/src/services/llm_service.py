@@ -72,7 +72,9 @@ class GroqLLMService:
                 temperature=0.2, # Low temperature for factual RAG
                 max_tokens=2048,
                 stream=True,
-                stop=["\n\n**Sources", "\n\nSources", "\n\nReferences", "## Sources"]
+                stop=[
+                    "\n\n**Sources", "\n\nSources", "\n[", "\n- ["
+                ]
             )
             
             async for chunk in stream:

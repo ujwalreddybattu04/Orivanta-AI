@@ -124,16 +124,22 @@ class SearchOrchestrator:
             
             # Robust buffer to catch 'Sources' sections even if split across tokens
             buffer = ""
-            # Regex to detect common hallucinated bibliography headers
-            cutoff_pattern = re.compile(r'\n+(?:\*\*|### |# )?(?:Sources|References|Bibliography)(?:\*\*|:)?\n+', re.IGNORECASE)
+            # Regex to detect common hallucinated bibliography headers OR clusters of markdown links
+            # Catch: ## Sources, **Sources**, [Domain](link), etc.
+            cutoff_pattern = re.compile(
+                r'(?:\n+|^)\s*(?:(?:\*\*|### |# )?(?:Sources|References|Bibliography)(?:\*\*|:)?|' # Header match
+                r'(?:\[[^\]]+\]\(https?://[^\s\)]+\)\s*){2,})', # Link cluster match (2+)
+                re.IGNORECASE
+            )
             
             async for chunk in groq_llm_service.stream_answer(query, search_results, messages):
                 buffer += chunk
                 
-                # Check for 'Sources' pattern in the last ~100 chars (performance optimization)
-                search_window = buffer[-100:] if len(buffer) > 100 else buffer
-                if cutoff_pattern.search(search_window) or "\nSources:" in search_window or "\nReferences:" in search_window:
+                # Check for 'Sources' pattern in the last ~150 chars (increased window)
+                search_window = buffer[-150:] if len(buffer) > 150 else buffer
+                if cutoff_pattern.search(search_window):
                     # We hit the forbidden section. Stop streaming immediately.
+                    logger.info("[orchestrator] NUCLEAR CUTOFF: Detect list/cluster. Truncating stream.")
                     break
                     
                 yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
