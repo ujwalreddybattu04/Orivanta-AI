@@ -30,12 +30,14 @@ function SearchPageContent() {
         history,
         query: currentQuery,
         answer,
+        displayAnswer,
         sources,
         images,
         researchSteps,
         relatedQuestions,
         isStreaming,
         isConnecting,
+        isDisplayComplete,
         error,
         model,
         thoughtTime,
@@ -141,10 +143,8 @@ function SearchPageContent() {
     return (
         <div className="sp-page">
             <div className={`sp-layout ${sourcesPanelOpen ? "sp-layout--panel-open" : ""}`}>
-
                 {/* ─── Main Column ─── */}
                 <div className="sp-main">
-
                     {/* Tab Bar */}
                     <motion.div
                         className="sp-tabbar"
@@ -156,10 +156,8 @@ function SearchPageContent() {
                             <button
                                 role="tab"
                                 aria-selected={activeTab === "answer"}
-                                aria-controls="panel-answer"
                                 className={`sp-tab ${activeTab === "answer" ? "sp-tab--active" : ""}`}
                                 onClick={() => setActiveTab("answer")}
-                                id="tab-answer"
                             >
                                 <Sparkles size={13} strokeWidth={2.5} />
                                 Answer
@@ -167,10 +165,8 @@ function SearchPageContent() {
                             <button
                                 role="tab"
                                 aria-selected={activeTab === "links"}
-                                aria-controls="panel-links"
                                 className={`sp-tab ${activeTab === "links" ? "sp-tab--active" : ""}`}
                                 onClick={() => setActiveTab("links")}
-                                id="tab-links"
                             >
                                 <Globe size={13} strokeWidth={2.5} />
                                 Links
@@ -178,10 +174,8 @@ function SearchPageContent() {
                             <button
                                 role="tab"
                                 aria-selected={activeTab === "images"}
-                                aria-controls="panel-images"
                                 className={`sp-tab ${activeTab === "images" ? "sp-tab--active" : ""}`}
                                 onClick={() => setActiveTab("images")}
-                                id="tab-images"
                             >
                                 <ImageIcon size={13} strokeWidth={2.5} />
                                 Images
@@ -201,60 +195,21 @@ function SearchPageContent() {
                     {/* Scrollable Content Area */}
                     <div className="sp-content">
                         <div className="sp-content-inner">
-
-
                             {/* === ANSWER TAB === */}
                             {activeTab === "answer" && (
-                                <>
-                                    {/* History — stable, no animations, no re-renders */}
+                                <div className="sp-thread-container">
+                                    {/* 1. History Turns */}
                                     {history && history.map((turn, idx) => (
-                                        <div key={`history-${idx}`} className="sp-thread-turn">
+                                        <motion.div
+                                            key={`history-${idx}`}
+                                            className="sp-thread-turn"
+                                            initial={{ opacity: 0, y: 20 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: idx * 0.05 }}
+                                        >
                                             <div className="sp-query-row">
                                                 <div className="sp-query-bubble-wrap">
-                                                    {editingQueryId === `history-${idx}` ? (
-                                                        <div className="sp-query-edit-container">
-                                                            <textarea
-                                                                autoFocus
-                                                                className="sp-query-edit-textarea"
-                                                                value={editingQueryText}
-                                                                onChange={(e) => setEditingQueryText(e.target.value)}
-                                                                onKeyDown={(e) => {
-                                                                    if (e.key === 'Escape') handleCancelEdit();
-                                                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                                                        e.preventDefault();
-                                                                        handleSubmitEdit(e);
-                                                                    }
-                                                                }}
-                                                                rows={2}
-                                                            />
-                                                            <div className="sp-query-edit-actions">
-                                                                <button type="button" className="sp-query-edit-cancel" onClick={handleCancelEdit}>Cancel</button>
-                                                                <button type="button" className="sp-query-edit-save" onClick={handleSubmitEdit}>Save</button>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <>
-                                                            <div className="sp-query-bubble">{turn.query}</div>
-                                                            <div className="sp-query-actions">
-                                                                <button
-                                                                    className="sp-query-action-btn"
-                                                                    onClick={() => handleStartEdit(turn.query, `history-${idx}`)}
-                                                                    aria-label="Edit query"
-                                                                    title="Edit"
-                                                                >
-                                                                    <Pencil size={13} strokeWidth={2} />
-                                                                </button>
-                                                                <button
-                                                                    className={`sp-query-action-btn ${copiedQueryId === `history-${idx}` ? 'copied' : ''}`}
-                                                                    onClick={() => handleCopyQuery(turn.query, `history-${idx}`)}
-                                                                    aria-label="Copy query"
-                                                                    title="Copy"
-                                                                >
-                                                                    {copiedQueryId === `history-${idx}` ? <Check size={13} strokeWidth={2.5} /> : <Copy size={13} strokeWidth={2} />}
-                                                                </button>
-                                                            </div>
-                                                        </>
-                                                    )}
+                                                    <div className="sp-query-bubble">{turn.query}</div>
                                                 </div>
                                             </div>
                                             <div className="sp-answer-body">
@@ -267,110 +222,98 @@ function SearchPageContent() {
                                                     thoughtTime={turn.thoughtTime}
                                                     onCopy={handleCopy}
                                                     sourcesPanelOpen={sourcesPanelOpen && activePanelQuery === turn.query}
-                                                    setSourcesPanelOpen={(open) => toggleSourcesPanel(open, turn.sources, turn.query)}
+                                                    setSourcesPanelOpen={(o) => toggleSourcesPanel(o, turn.sources, turn.query)}
                                                 />
                                             </div>
-                                        </div>
+                                            <div className="sp-turn-divider" />
+                                        </motion.div>
                                     ))}
 
-                                    {/* Current Turn Query */}
+                                    {/* 2. Current Turn (Active) */}
                                     <motion.div
-                                        className="sp-query-row"
-                                        id="current-query-row"
-                                        initial={{ opacity: 0, y: 15 }}
+                                        key="current-turn"
+                                        className="sp-thread-turn"
+                                        initial={{ opacity: 0, y: 20 }}
                                         animate={{ opacity: 1, y: 0 }}
-                                        transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1.0] }}
+                                        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                                     >
-                                        <div className="sp-query-bubble-wrap">
-                                            {editingQueryId === 'current' ? (
-                                                <div className="sp-query-edit-container">
-                                                    <textarea
-                                                        autoFocus
-                                                        className="sp-query-edit-textarea"
-                                                        value={editingQueryText}
-                                                        onChange={(e) => setEditingQueryText(e.target.value)}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Escape') handleCancelEdit();
-                                                            if (e.key === 'Enter' && !e.shiftKey) {
-                                                                e.preventDefault();
-                                                                handleSubmitEdit(e);
-                                                            }
-                                                        }}
-                                                        rows={2}
-                                                    />
-                                                    <div className="sp-query-edit-actions">
-                                                        <button type="button" className="sp-query-edit-cancel" onClick={handleCancelEdit}>Cancel</button>
-                                                        <button type="button" className="sp-query-edit-save" onClick={handleSubmitEdit}>Save</button>
+                                        <div className="sp-query-row" id="current-query-row">
+                                            <div className="sp-query-bubble-wrap">
+                                                {editingQueryId === 'current' ? (
+                                                    <div className="sp-query-edit-container">
+                                                        <textarea
+                                                            autoFocus
+                                                            className="sp-query-edit-textarea"
+                                                            value={editingQueryText}
+                                                            onChange={(e) => setEditingQueryText(e.target.value)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Escape') handleCancelEdit();
+                                                                if (e.key === 'Enter' && !e.shiftKey) {
+                                                                    e.preventDefault();
+                                                                    handleSubmitEdit(e);
+                                                                }
+                                                            }}
+                                                            rows={2}
+                                                        />
+                                                        <div className="sp-query-edit-actions">
+                                                            <button type="button" className="sp-query-edit-cancel" onClick={handleCancelEdit}>Cancel</button>
+                                                            <button type="button" className="sp-query-edit-save" onClick={handleSubmitEdit}>Save</button>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            ) : (
-                                                <>
-                                                    <div className="sp-query-bubble">{currentQuery}</div>
-                                                    <div className="sp-query-actions">
-                                                        <button
-                                                            className="sp-query-action-btn"
-                                                            onClick={() => handleStartEdit(currentQuery, 'current')}
-                                                            aria-label="Edit query"
-                                                            title="Edit"
-                                                        >
-                                                            <Pencil size={13} strokeWidth={2} />
-                                                        </button>
-                                                        <button
-                                                            className={`sp-query-action-btn ${copiedQueryId === 'current' ? 'copied' : ''}`}
-                                                            onClick={() => handleCopyQuery(currentQuery, 'current')}
-                                                            aria-label="Copy query"
-                                                            title="Copy"
-                                                        >
-                                                            {copiedQueryId === 'current' ? <Check size={13} strokeWidth={2.5} /> : <Copy size={13} strokeWidth={2} />}
-                                                        </button>
-                                                    </div>
-                                                </>
-                                            )}
+                                                ) : (
+                                                    <>
+                                                        <div className="sp-query-bubble">{currentQuery}</div>
+                                                        <div className="sp-query-actions">
+                                                            <button
+                                                                className="sp-query-action-btn"
+                                                                onClick={() => handleStartEdit(currentQuery, 'current')}
+                                                                title="Edit"
+                                                            >
+                                                                <Pencil size={13} strokeWidth={2} />
+                                                            </button>
+                                                            <button
+                                                                className={`sp-query-action-btn ${copiedQueryId === 'current' ? 'copied' : ''}`}
+                                                                onClick={() => handleCopyQuery(currentQuery, 'current')}
+                                                                title="Copy"
+                                                            >
+                                                                {copiedQueryId === 'current' ? <Check size={13} strokeWidth={2.5} /> : <Copy size={13} strokeWidth={2} />}
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
                                         </div>
+
+                                        {(displayAnswer || isStreaming) && (
+                                            <div className="sp-answer-body">
+                                                <AnswerStream
+                                                    query={currentQuery}
+                                                    content={displayAnswer}
+                                                    isStreaming={!isDisplayComplete}
+                                                    sources={sources}
+                                                    researchSteps={researchSteps}
+                                                    thoughtTime={thoughtTime}
+                                                    onCopy={handleCopy}
+                                                    sourcesPanelOpen={sourcesPanelOpen && activePanelQuery === currentQuery}
+                                                    setSourcesPanelOpen={(o) => toggleSourcesPanel(o, sources, currentQuery)}
+                                                    relatedQuestions={relatedQuestions}
+                                                    onRelatedSelect={handleRelatedSelect}
+                                                />
+                                            </div>
+                                        )}
+
+                                        {error && !isLoading && (
+                                            <div className="sp-error">
+                                                <div className="sp-error-icon">⚡</div>
+                                                <h2 className="sp-error-title">{error.includes("fetch") ? "Backend not connected" : "Search Error"}</h2>
+                                                <p className="sp-error-msg">{error}</p>
+                                            </div>
+                                        )}
                                     </motion.div>
-
-                                    {error && !isLoading && (
-                                        <div className="sp-error">
-                                            <div className="sp-error-icon">⚡</div>
-                                            <h2 className="sp-error-title">{error.includes("fetch") ? "Backend not connected" : "Search Error"}</h2>
-                                            <p className="sp-error-msg">
-                                                {error.includes("fetch")
-                                                    ? <>Start the backend at <code>http://localhost:8000</code> to see live AI answers.</>
-                                                    : error
-                                                }
-                                            </p>
-                                        </div>
-                                    )}
-
-                                    {/* Current answer */}
-                                    {(answer || isStreaming) && (
-                                        <motion.div
-                                            className="sp-answer-body"
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            transition={{ duration: 0.3, ease: "easeOut" }}
-                                        >
-                                            <AnswerStream
-                                                query={currentQuery}
-                                                content={answer}
-                                                isStreaming={isStreaming}
-                                                sources={sources}
-                                                researchSteps={researchSteps}
-                                                thoughtTime={thoughtTime}
-                                                onCopy={handleCopy}
-                                                sourcesPanelOpen={sourcesPanelOpen && activePanelQuery === currentQuery}
-                                                setSourcesPanelOpen={(open) => toggleSourcesPanel(open, sources, currentQuery)}
-                                                relatedQuestions={relatedQuestions}
-                                                onRelatedSelect={handleRelatedSelect}
-                                            />
-                                        </motion.div>
-                                    )}
-
-                                    {/* Follow-ups moved to AnswerStream */}
-                                </>
+                                </div>
                             )}
 
-                            {/* === LINKS TAB — Perplexity-style search results === */}
+                            {/* === LINKS TAB === */}
                             {activeTab === "links" && (
                                 <div className="sp-links-tab">
                                     {sources.length === 0 ? (
@@ -383,46 +326,29 @@ function SearchPageContent() {
                                             ) : error ? (
                                                 <div className="sp-links-error">
                                                     <div className="sp-error-icon">⚠️</div>
-                                                    <span>{error.includes("Tavily") ? "Web search limit reached (Tavily). Using internal knowledge." : error}</span>
+                                                    <span>{error.includes("Tavily") ? "Web search limit" : error}</span>
                                                 </div>
                                             ) : (
-                                                "No links found for this query."
+                                                "No links found."
                                             )}
                                         </div>
                                     ) : (
-                                        <>
-                                            <div className="sp-links-header">
-                                                Search results for: <strong>{currentQuery}</strong>
-                                            </div>
-                                            <div className="sp-links-list">
-                                                {sources.map((src, i) => (
-                                                    <a
-                                                        key={i}
-                                                        href={src.url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="sp-link-item"
-                                                        id={`link-result-${i}`}
-                                                    >
-                                                        <div className="sp-link-left">
-                                                            {/* Favicon circle */}
-                                                            <div className="sp-link-favicon">
-                                                                <Favicon url={src.url} domain={src.domain || ''} size={20} />
-                                                            </div>
-                                                            {/* Content block */}
-                                                            <div className="sp-link-content">
-                                                                <div className="sp-link-meta">
-                                                                    <span className="sp-link-domain-name">{src.domain?.replace(/^www\./, '')}</span>
-                                                                </div>
-                                                                <div className="sp-link-url">{src.url}</div>
-                                                                <div className="sp-link-title">{src.title}</div>
-                                                                {src.snippet && <div className="sp-link-snippet">{src.snippet}</div>}
-                                                            </div>
+                                        <div className="sp-links-list">
+                                            {sources.map((src, i) => (
+                                                <a key={i} href={src.url} target="_blank" rel="noopener noreferrer" className="sp-link-item">
+                                                    <div className="sp-link-left">
+                                                        <div className="sp-link-favicon">
+                                                            <Favicon url={src.url} domain={src.domain || ''} size={20} />
                                                         </div>
-                                                    </a>
-                                                ))}
-                                            </div>
-                                        </>
+                                                        <div className="sp-link-content">
+                                                            <div className="sp-link-meta">{src.domain?.replace(/^www\./, '')}</div>
+                                                            <div className="sp-link-title">{src.title}</div>
+                                                            {src.snippet && <div className="sp-link-snippet">{src.snippet}</div>}
+                                                        </div>
+                                                    </div>
+                                                </a>
+                                            ))}
+                                        </div>
                                     )}
                                 </div>
                             )}
@@ -430,182 +356,112 @@ function SearchPageContent() {
                             {/* === IMAGES TAB === */}
                             {activeTab === "images" && (
                                 <div className="sp-images-tab">
-                                    {/* History Images */}
                                     {history && history.map((turn, idx) => (
                                         turn.images && turn.images.length > 0 && (
-                                            <div key={`history-img-${idx}`} className="sp-thread-turn">
+                                            <div key={idx} className="sp-thread-turn">
                                                 <div className="sp-query-bubble">{turn.query}</div>
                                                 <div className="sp-image-grid">
                                                     {turn.images.map((img, i) => (
                                                         <a key={i} href={img.url} target="_blank" rel="noopener noreferrer" className="sp-image-card">
-                                                            <div className="sp-image-wrapper">
-                                                                <img
-                                                                    src={img.url}
-                                                                    alt={img.alt || "Search result"}
-                                                                    loading="lazy"
-                                                                    onError={(e) => {
-                                                                        (e.currentTarget as HTMLImageElement).style.display = 'none';
-                                                                        const parent = e.currentTarget.parentElement;
-                                                                        if (parent) {
-                                                                            parent.classList.add('broken-image');
-                                                                            let initial = 'I';
-                                                                            try { initial = new URL(img.url).hostname.replace('www.', '')[0].toUpperCase(); } catch (err) { }
-                                                                            parent.innerHTML = `<span class="sp-image-fallback-letter">${initial}</span>`;
-                                                                        }
-                                                                    }}
-                                                                />
-                                                            </div>
-                                                            <div className="sp-image-meta">
-                                                                <span className="sp-image-domain">
-                                                                    {(() => {
-                                                                        try { return new URL(img.url).hostname.replace('www.', ''); }
-                                                                        catch (e) { return 'Image'; }
-                                                                    })()}
-                                                                </span>
-                                                            </div>
+                                                            <div className="sp-image-wrapper"><img src={img.url} alt="result" /></div>
+                                                            <div className="sp-image-meta"><span>{(() => { try { return new URL(img.url).hostname.replace('www.', ''); } catch (e) { return 'Image'; } })()}</span></div>
                                                         </a>
                                                     ))}
                                                 </div>
                                             </div>
                                         )
                                     ))}
-
-                                    {/* Current Query Images */}
                                     {(isConnecting || isStreaming || answer || images.length > 0) && (
-                                        <div className="sp-thread-turn sp-current-turn">
-                                            <div className="sp-query-row" id="current-query-row">
-                                                <div className="sp-query-bubble">{currentQuery}</div>
-                                            </div>
-
+                                        <div className="sp-thread-turn">
+                                            <div className="sp-query-bubble">{currentQuery}</div>
                                             {images.length > 0 ? (
-                                                <motion.div
-                                                    className="sp-image-grid"
-                                                    initial={{ opacity: 0, y: 10 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    transition={{ duration: 0.4 }}
-                                                >
+                                                <motion.div className="sp-image-grid" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                                                     {images.map((img, i) => (
                                                         <a key={i} href={img.url} target="_blank" rel="noopener noreferrer" className="sp-image-card">
-                                                            <div className="sp-image-wrapper">
-                                                                <img
-                                                                    src={img.url}
-                                                                    alt={img.alt || "Search result"}
-                                                                    loading="lazy"
-                                                                    onError={(e) => {
-                                                                        (e.currentTarget as HTMLImageElement).style.display = 'none';
-                                                                        const parent = e.currentTarget.parentElement;
-                                                                        if (parent) {
-                                                                            parent.classList.add('broken-image');
-                                                                            let initial = 'I';
-                                                                            try { initial = new URL(img.url).hostname.replace('www.', '')[0].toUpperCase(); } catch (err) { }
-                                                                            parent.innerHTML = `<span class="sp-image-fallback-letter">${initial}</span>`;
-                                                                        }
-                                                                    }}
-                                                                />
-                                                            </div>
-                                                            <div className="sp-image-meta">
-                                                                <span className="sp-image-domain">
-                                                                    {(() => {
-                                                                        try { return new URL(img.url).hostname.replace('www.', ''); }
-                                                                        catch (e) { return 'Image'; }
-                                                                    })()}
-                                                                </span>
-                                                            </div>
+                                                            <div className="sp-image-wrapper"><img src={img.url} alt="result" /></div>
+                                                            <div className="sp-image-meta"><span>{(() => { try { return new URL(img.url).hostname.replace('www.', ''); } catch (e) { return 'Image'; } })()}</span></div>
                                                         </a>
                                                     ))}
                                                 </motion.div>
                                             ) : (
-                                                <div className="sp-images-loading">
-                                                    {isStreaming || isConnecting ? (
-                                                        <div className="sp-pulsing-dots">
-                                                            <div className="sp-dot"></div>
-                                                            <div className="sp-dot"></div>
-                                                            <div className="sp-dot"></div>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="sp-empty-tab sp-empty-images-msg">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect width="18" height="18" x="3" y="3" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>
-                                                            <p>No images found for this query.</p>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                <div className="sp-images-loading">Searching...</div>
                                             )}
                                         </div>
                                     )}
                                 </div>
                             )}
-                        </div>{/* end sp-content-inner */}
+                        </div>
                     </div>
 
-                    {/* Sticky Input Bar — at bottom of main column */}
+                    {/* Sticky Input Bar */}
                     {activeTab === "answer" && (
                         <div className="sp-input-bar">
                             <form className="sp-input-form" onSubmit={handleFollowUp}>
-                                <button type="button" className="sp-input-attach" aria-label="Attach">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
-                                </button>
-                                <input
-                                    type="text"
-                                    className="sp-input-field"
-                                    placeholder="Ask a follow-up"
-                                    value={followUp}
-                                    onChange={e => setFollowUp(e.target.value)}
-                                    autoComplete="off"
-                                    autoCorrect="off"
-                                    spellCheck={false}
-                                    id="follow-up-input"
-                                />
+                                <button type="button" className="sp-input-attach"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg></button>
+                                <input type="text" className="sp-input-field" placeholder="Ask a follow-up" value={followUp} onChange={e => setFollowUp(e.target.value)} />
                                 <div className="sp-input-actions">
-                                    <button type="button" className="sp-model-btn" aria-label="Select model">
-                                        Model <span className="sp-model-arrow">▾</span>
-                                    </button>
-                                    <button type="button" className="sp-voice-btn" aria-label="Voice input">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" x2="12" y1="19" y2="22" /></svg>
-                                    </button>
-                                    <button type="submit" className="sp-submit-btn" disabled={!followUp.trim() || isConnecting || isStreaming} aria-label="Send">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z" /></svg>
-                                    </button>
+                                    <button type="button" className="sp-model-btn">Model ▾</button>
+                                    <button type="submit" className="sp-submit-btn" disabled={!followUp.trim() || isConnecting || isStreaming}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z" /></svg></button>
                                 </div>
                             </form>
                         </div>
                     )}
                 </div>
 
-                {/* ─── Right Sources Panel — Always rendered to allow smooth CSS transitions ─── */}
-                <aside className="sp-sources-panel" id="sources-panel">
+                {/* Sources Panel — Perplexity-class design */}
+                <aside className="sp-sources-panel">
                     <div className="sp-sources-panel-header">
-                        <div>
+                        <div className="sp-sources-panel-header-left">
                             <h3 className="sp-sources-panel-title">
-                                {activePanelSources.length > 0 ? `${activePanelSources.length} sources` : "Sources"}
+                                {activePanelSources.length > 0
+                                    ? `${activePanelSources.length} sources`
+                                    : "Sources"}
                             </h3>
+                            {activePanelQuery && (
+                                <p className="sp-sources-panel-subtitle">
+                                    Sources for {activePanelQuery}
+                                </p>
+                            )}
                         </div>
                         <button
                             className="sp-sources-panel-close"
                             onClick={() => setSourcesPanelOpen(false)}
                             aria-label="Close sources panel"
-                        >✕</button>
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" x2="6" y1="6" y2="18" /><line x1="6" x2="18" y1="6" y2="18" /></svg>
+                        </button>
                     </div>
-
                     {activePanelSources.length > 0 ? (
                         <div className="sp-sources-panel-list">
                             {activePanelSources.map((src, i) => (
-                                <a key={i} href={src.url} target="_blank" rel="noopener noreferrer" className="sp-source-item" id={`source-item-${i + 1}`}>
+                                <a
+                                    key={i}
+                                    href={src.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="sp-source-item"
+                                >
                                     <div className="sp-source-item-icon">
-                                        <Favicon url={src.url} domain={src.domain || ''} size={24} />
+                                        <Favicon url={src.url} domain={src.domain || ''} size={20} />
                                     </div>
                                     <div className="sp-source-item-body">
-                                        <div className="sp-source-item-domain-row">
-                                            <div className="sp-source-item-domain">{src.domain}</div>
+                                        <div className="sp-source-item-domain">
+                                            {(src.domain || '').replace(/^www\./, '')}
                                         </div>
                                         <div className="sp-source-item-title">{src.title}</div>
-                                        {src.snippet && <div className="sp-source-item-snippet">{src.snippet}</div>}
+                                        {src.snippet && (
+                                            <div className="sp-source-item-snippet">{src.snippet}</div>
+                                        )}
                                     </div>
                                 </a>
                             ))}
                         </div>
                     ) : (
                         <div className="sp-sources-empty">
-                            {isLoading ? "Finding top sources..." : "No sources available. Start the backend to see sources."}
+                            <div className="sp-sources-empty-dots">
+                                <span></span><span></span><span></span>
+                            </div>
+                            Finding top sources...
                         </div>
                     )}
                 </aside>

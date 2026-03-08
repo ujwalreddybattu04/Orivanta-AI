@@ -91,10 +91,61 @@ export function useSearch(initialQuery: string, focusMode: string = "all", exist
         thoughtTime: 0,
     });
 
+    // --- BUTTERY SMOOTH STREAMING BUFFER ---
+    const [displayAnswer, setDisplayAnswer] = useState("");
+    const [isBufferDraining, setIsBufferDraining] = useState(false);
+    const streamingBufferRef = useRef("");
+    const animationFrameRef = useRef<number | null>(null);
+    const lastUpdateTimeRef = useRef(0);
+
     const abortRef = useRef<AbortController | null>(null);
     const hasStarted = useRef(false);
     const lastProcessedQuery = useRef<string | null>(null);
     const threadIdRef = useRef<string | null>(existingThreadId || null);
+
+    // Animation loop to drip text into displayAnswer
+    useEffect(() => {
+        const updateDisplay = (timestamp: number) => {
+            if (!lastUpdateTimeRef.current) lastUpdateTimeRef.current = timestamp;
+            const progress = timestamp - lastUpdateTimeRef.current;
+
+            // Update roughly every 50ms for "buttery" feel (20fps for text is ideal)
+            if (progress > 50 && streamingBufferRef.current.length > 0) {
+                // Take a small slice of the buffer. 
+                // We take up to 8 chars or until the next space to keep it word-ish.
+                let sliceEnd = 8;
+                const nextSpace = streamingBufferRef.current.indexOf(" ", 5);
+                if (nextSpace !== -1 && nextSpace < 15) {
+                    sliceEnd = nextSpace + 1;
+                }
+
+                const slice = streamingBufferRef.current.slice(0, sliceEnd);
+                streamingBufferRef.current = streamingBufferRef.current.slice(sliceEnd);
+
+                setDisplayAnswer(prev => prev + slice);
+                lastUpdateTimeRef.current = timestamp;
+            }
+
+            // Check if we still need to keep running
+            const hasBufferContent = streamingBufferRef.current.length > 0;
+            if (state.isStreaming || hasBufferContent) {
+                setIsBufferDraining(hasBufferContent && !state.isStreaming);
+                animationFrameRef.current = requestAnimationFrame(updateDisplay);
+            } else {
+                // Buffer is fully drained and streaming is done
+                setIsBufferDraining(false);
+            }
+        };
+
+        if (state.isStreaming || streamingBufferRef.current.length > 0) {
+            setIsBufferDraining(true);
+            animationFrameRef.current = requestAnimationFrame(updateDisplay);
+        }
+
+        return () => {
+            if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+        };
+    }, [state.isStreaming]);
 
     const runSearch = useCallback(async (q: string, focus: string, backendMessages?: any[], keepHistory?: SearchMessage[]) => {
         if (!q.trim()) return;
@@ -102,6 +153,9 @@ export function useSearch(initialQuery: string, focusMode: string = "all", exist
         // Abort any in-flight request
         abortRef.current?.abort();
         abortRef.current = new AbortController();
+
+        streamingBufferRef.current = "";
+        setDisplayAnswer("");
 
         setState(prev => ({
             ...prev,
@@ -161,7 +215,9 @@ export function useSearch(initialQuery: string, focusMode: string = "all", exist
                         const json = JSON.parse(jsonPayload);
 
                         if (json.type === "token") {
-                            setState(prev => ({ ...prev, answer: prev.answer + (json.content || "") }));
+                            const chunk = json.content || "";
+                            streamingBufferRef.current += chunk;
+                            setState(prev => ({ ...prev, answer: prev.answer + chunk }));
                         } else if (json.type === "sources") {
                             // Support multiple possible keys for robustness
                             const sourcesList = json.sources || json.items || json.results || [];
@@ -342,6 +398,7 @@ export function useSearch(initialQuery: string, focusMode: string = "all", exist
                                     isConnecting: false,
                                     isStreaming: false
                                 }));
+                                setDisplayAnswer(thread.answer);
                                 threadIdRef.current = thread.id;
                                 hasStarted.current = true;
                                 lastProcessedQuery.current = thread.query;
@@ -370,5 +427,9 @@ export function useSearch(initialQuery: string, focusMode: string = "all", exist
         };
     }, [initialQuery, focusMode, existingThreadId, runSearch]);
 
-    return { ...state, appendQuery, retry: () => runSearch(state.query, focusMode) };
+    // isDisplayComplete: true only when streaming is done AND the display buffer is fully drained.
+    // This prevents follow-ups/actions from appearing while the answer is still visually rendering.
+    const isDisplayComplete = !state.isStreaming && !isBufferDraining;
+
+    return { ...state, displayAnswer: displayAnswer || state.answer, isDisplayComplete, appendQuery, retry: () => runSearch(state.query, focusMode) };
 }
