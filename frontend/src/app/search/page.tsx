@@ -9,6 +9,7 @@ import AnswerSkeleton from "@/components/thread/AnswerSkeleton";
 import ImagesGrid from "@/components/thread/ImagesGrid";
 import { Sparkles, Globe, Image as ImageIcon, Pencil, Copy, Check, CornerDownRight } from "lucide-react";
 import { Favicon } from "@/components/common";
+import ThreadMenu from "@/components/thread/ThreadMenu";
 
 function SearchPageContent() {
     const searchParams = useSearchParams();
@@ -27,6 +28,7 @@ function SearchPageContent() {
     const [editingQueryText, setEditingQueryText] = useState("");
 
     const {
+        threadId: activeThreadId,
         history,
         query: currentQuery,
         answer,
@@ -178,6 +180,14 @@ function SearchPageContent() {
                             </div>
 
                             <div className="sp-tabbar-right">
+                                <ThreadMenu
+                                    threadId={activeThreadId}
+                                    query={currentQuery}
+                                    answer={answer}
+                                    history={history}
+                                    onDelete={() => router.push("/")}
+                                    onRename={() => {}}
+                                />
                                 <button className="sp-share-btn">Share</button>
                             </div>
                         </motion.div>

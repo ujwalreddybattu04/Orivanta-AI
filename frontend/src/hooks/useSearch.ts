@@ -164,6 +164,10 @@ export function useSearch(initialQuery: string, focusMode: string = "all", exist
                 if (!currentThreadId) {
                     currentThreadId = generateThreadId();
                     threadIdRef.current = currentThreadId;
+                    // Expose the generated ID so consumers (e.g. ThreadMenu) can reference it
+                    setState(prev =>
+                        prev.threadId === currentThreadId ? prev : { ...prev, threadId: currentThreadId }
+                    );
                 }
 
                 const threadsJson = localStorage.getItem("corten_threads") || localStorage.getItem("orivanta_threads");
