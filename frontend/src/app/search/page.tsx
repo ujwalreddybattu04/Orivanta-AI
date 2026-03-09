@@ -145,6 +145,7 @@ function SearchPageContent() {
     }, [currentQuery, isConnecting, isStreaming, history.length]);
 
     return (
+        <>
         <div className="sp-page">
             <div className={`sp-layout ${sourcesPanelOpen ? "sp-layout--panel-open" : ""}`}>
                 {/* ─── Main Column ─── */}
@@ -522,6 +523,7 @@ function SearchPageContent() {
             query={currentQuery}
             answer={answer}
         />
+        </>
     );
 }
 
