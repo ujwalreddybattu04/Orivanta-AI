@@ -1,11 +1,10 @@
-"""
-Search endpoints — POST /search (streaming SSE)
-"""
-
+import logging
 from pydantic import BaseModel
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from typing import List, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 from src.services.search_orchestrator import search_orchestrator
 
