@@ -7,10 +7,7 @@ export async function POST(
     { params }: { params: { path: string[] } }
 ) {
     const path = params.path.join('/');
-    // Use BACKEND_URL to avoid Next.js "baking in" NEXT_PUBLIC_ variables at build time
-    let backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_APT_URL || 'http://localhost:8000';
-    // Remove trailing slash if present
-    backendUrl = backendUrl.replace(/\/$/, "");
+    const backendUrl = 'https://orivanta-87056410261.europe-west1.run.app'.replace(/\/$/, "");
     const targetUrl = `${backendUrl}/api/v1/${path}`;
 
     console.log(`[proxy] Proxying POST to: ${targetUrl}`);
@@ -19,9 +16,6 @@ export async function POST(
         const body = await request.json();
 
         console.log(`[proxy] Target URL: ${targetUrl}`);
-        if (backendUrl.includes('localhost')) {
-            console.warn(`[proxy] WARNING: Backend URL is defaulting to localhost. This will likely fail on GCP.`);
-        }
 
         const response = await fetch(targetUrl, {
             method: 'POST',
@@ -29,8 +23,7 @@ export async function POST(
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(body),
-            // Add a timeout to prevent hanging
-            signal: AbortSignal.timeout(10000),
+            signal: AbortSignal.timeout(60000),
         });
 
         if (!response.ok) {
@@ -46,7 +39,6 @@ export async function POST(
             });
         }
 
-        // For streaming responses, we need to pass the stream through
         if (response.headers.get('content-type')?.includes('text/event-stream')) {
             return new Response(response.body, {
                 headers: {
@@ -64,11 +56,9 @@ export async function POST(
 
     } catch (error: any) {
         console.error(`[proxy] Proxy failed: ${error.message}`);
-        const isLocalhost = targetUrl.includes('localhost');
-        const tip = isLocalhost ? "The frontend is trying to talk to 'localhost'. Please set BACKEND_URL in GCP Cloud Run." : "Check if your Backend URL is correct and active.";
 
         return new Response(JSON.stringify({
-            message: `${error.message}. TIP: ${tip} (Target: ${targetUrl})`,
+            message: `${error.message} (Target: ${targetUrl})`,
             target: targetUrl
         }), {
             status: 500,
@@ -77,21 +67,18 @@ export async function POST(
     }
 }
 
-// Handle other methods if needed
 export async function GET(
     request: NextRequest,
     { params }: { params: { path: string[] } }
 ) {
     const path = params.path.join('/');
-    let backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_APT_URL || 'http://localhost:8000';
-    // Remove trailing slash if present
-    backendUrl = backendUrl.replace(/\/$/, "");
+    const backendUrl = 'https://orivanta-87056410261.europe-west1.run.app'.replace(/\/$/, "");
     const targetUrl = `${backendUrl}/api/v1/${path}`;
 
     console.log(`[proxy] Proxying GET to: ${targetUrl}`);
 
     try {
-        const response = await fetch(targetUrl, { signal: AbortSignal.timeout(5000) });
+        const response = await fetch(targetUrl, { signal: AbortSignal.timeout(60000) });
         if (!response.ok) {
             return new Response(await response.text(), { status: response.status });
         }
