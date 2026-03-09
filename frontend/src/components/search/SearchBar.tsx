@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, FormEvent } from "react";
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 const FOCUS_TABS = [
@@ -10,15 +10,30 @@ const FOCUS_TABS = [
     { value: "math", label: "Math" },
 ];
 
-export default function SearchBar() {
+export interface SearchBarHandle {
+    setQueryAndSubmit: (q: string) => void;
+}
+
+const SearchBar = forwardRef<SearchBarHandle, object>(function SearchBar(_, ref) {
     const [query, setQuery] = useState("");
     const [focusMode, setFocusMode] = useState("all");
     const router = useRouter();
     const inputRef = useRef<HTMLInputElement>(null);
 
+    useImperativeHandle(ref, () => ({
+        setQueryAndSubmit(q: string) {
+            setQuery(q);
+            inputRef.current?.focus();
+            // Short delay so React flushes the new value before navigation
+            setTimeout(() => {
+                router.push(`/search?q=${encodeURIComponent(q)}&focus=all`);
+            }, 60);
+        },
+    }));
+
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+            if ((e.metaKey || e.ctrlKey) && e.key === "k") {
                 e.preventDefault();
                 inputRef.current?.focus();
             }
@@ -89,4 +104,6 @@ export default function SearchBar() {
             </div>
         </form>
     );
-}
+});
+
+export default SearchBar;

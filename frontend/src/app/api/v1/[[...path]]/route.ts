@@ -6,9 +6,9 @@ const BACKEND_URL = (process.env.BACKEND_URL || 'https://orivanta-87056410261.eu
 
 export async function POST(
     request: NextRequest,
-    { params }: { params: Promise<{ path: string[] }> }
+    { params }: { params: Promise<{ path?: string[] }> }
 ) {
-    const { path } = await params;
+    const { path = [] } = await params;
     const targetUrl = `${BACKEND_URL}/api/v1/${path.join('/')}`;
 
     console.log(`[proxy] Proxying POST to: ${targetUrl}`);
@@ -68,9 +68,9 @@ export async function POST(
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: Promise<{ path: string[] }> }
+    { params }: { params: Promise<{ path?: string[] }> }
 ) {
-    const { path } = await params;
+    const { path = [] } = await params;
     const targetUrl = `${BACKEND_URL}/api/v1/${path.join('/')}`;
 
     console.log(`[proxy] Proxying GET to: ${targetUrl}`);

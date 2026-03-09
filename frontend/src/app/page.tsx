@@ -1,4 +1,4 @@
-import { SearchBar, QuickActions } from "@/components/search";
+import HomeHero from "@/components/search/HomeHero";
 import { StarField } from "@/components/common";
 import PrivateToggle from "@/components/common/PrivateToggle";
 import { BRAND_NAME } from "@/config/constants";
@@ -10,8 +10,7 @@ export default function HomePage() {
             <StarField />
             <div className="home-hero">
                 <h1 className="home-title">{BRAND_NAME}</h1>
-                <SearchBar />
-                <QuickActions />
+                <HomeHero />
             </div>
         </div>
     );
