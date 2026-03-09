@@ -7,6 +7,7 @@ import "@/styles/sidebar.css";
 import "@/styles/searchbar.css";
 import "@/styles/home.css";
 import "@/styles/thread.css";
+import "@/styles/share.css";
 import "@/styles/components/PrivateToggle.css";
 import { Suspense } from "react";
 import { Sidebar } from "@/components/layout";

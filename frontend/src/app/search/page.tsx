@@ -10,6 +10,7 @@ import ImagesGrid from "@/components/thread/ImagesGrid";
 import { Sparkles, Globe, Image as ImageIcon, Pencil, Copy, Check, CornerDownRight } from "lucide-react";
 import { Favicon } from "@/components/common";
 import ThreadMenu from "@/components/thread/ThreadMenu";
+import ShareModal from "@/components/thread/ShareModal";
 
 function SearchPageContent() {
     const searchParams = useSearchParams();
@@ -24,6 +25,7 @@ function SearchPageContent() {
     const [activePanelQuery, setActivePanelQuery] = useState("");
     const [copied, setCopied] = useState(false);
     const [copiedQueryId, setCopiedQueryId] = useState<string | null>(null);
+    const [shareOpen, setShareOpen] = useState(false);
     const [editingQueryId, setEditingQueryId] = useState<string | null>(null);
     const [editingQueryText, setEditingQueryText] = useState("");
 
@@ -188,7 +190,12 @@ function SearchPageContent() {
                                     onDelete={() => router.push("/")}
                                     onRename={() => {}}
                                 />
-                                <button className="sp-share-btn">Share</button>
+                                <button
+                                    className="sp-share-btn"
+                                    onClick={() => setShareOpen(true)}
+                                >
+                                    Share
+                                </button>
                             </div>
                         </motion.div>
                     </div>
@@ -507,6 +514,14 @@ function SearchPageContent() {
                 </aside>
             </div >
         </div >
+
+        {/* Share Modal */}
+        <ShareModal
+            isOpen={shareOpen}
+            onClose={() => setShareOpen(false)}
+            query={currentQuery}
+            answer={answer}
+        />
     );
 }
 
