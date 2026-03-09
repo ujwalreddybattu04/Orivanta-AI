@@ -7,7 +7,7 @@ export async function POST(
     { params }: { params: { path: string[] } }
 ) {
     const path = params.path.join('/');
-    let backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    let backendUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_APT_URL || 'http://localhost:8000';
     // Remove trailing slash if present
     backendUrl = backendUrl.replace(/\/$/, "");
     const targetUrl = `${backendUrl}/api/v1/${path}`;
@@ -36,9 +36,8 @@ export async function POST(
             const errorText = await response.text();
             console.error(`[proxy] Backend returned error ${response.status}: ${errorText}`);
             return new Response(JSON.stringify({
-                error: "Backend Error",
+                message: errorText || "Backend Error",
                 status: response.status,
-                detail: errorText,
                 url: targetUrl
             }), {
                 status: response.status,
@@ -65,10 +64,10 @@ export async function POST(
     } catch (error: any) {
         console.error(`[proxy] Proxy failed: ${error.message}`);
         const isLocalhost = targetUrl.includes('localhost');
+        const tip = isLocalhost ? "The frontend is trying to talk to 'localhost'. Please set NEXT_PUBLIC_API_URL in GCP Cloud Run." : "Check if your Backend URL is correct and active.";
+
         return new Response(JSON.stringify({
-            error: "Proxy Connection Failed",
-            message: error.message,
-            tip: isLocalhost ? "The frontend is trying to talk to 'localhost'. Please set NEXT_PUBLIC_API_URL in GCP Cloud Run." : "Check if your Backend URL is correct and active.",
+            message: `${error.message}. TIP: ${tip} (Target: ${targetUrl})`,
             target: targetUrl
         }), {
             status: 500,
@@ -83,7 +82,7 @@ export async function GET(
     { params }: { params: { path: string[] } }
 ) {
     const path = params.path.join('/');
-    let backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    let backendUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_APT_URL || 'http://localhost:8000';
     // Remove trailing slash if present
     backendUrl = backendUrl.replace(/\/$/, "");
     const targetUrl = `${backendUrl}/api/v1/${path}`;
