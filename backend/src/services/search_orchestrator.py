@@ -36,7 +36,7 @@ class SearchOrchestrator:
             search_task = asyncio.create_task(tavily_search_service.search(query, max_results=settings.MAX_SEARCH_RESULTS + 2))
             plan_task = asyncio.create_task(groq_llm_service.generate_research_plan(query))
             # Fire image search in parallel — runs while Tavily + LLM are working
-            image_task = asyncio.create_task(serper_image_service.search_images(query))
+            image_task = asyncio.create_task(serper_image_service.search_images(query, num=20))
 
             yield f"data: {json.dumps({'type': 'status', 'content': 'Analyzing query...'})}\n\n"
 

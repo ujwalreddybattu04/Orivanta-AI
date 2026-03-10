@@ -432,6 +432,7 @@ export default function ThreadMenu({
                                 }}
                                 placeholder="Thread title..."
                                 maxLength={120}
+                                suppressHydrationWarning
                             />
                             <div className="tdm-modal-actions">
                                 <button

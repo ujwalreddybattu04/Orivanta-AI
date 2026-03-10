@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 import type { SearchImage } from "@/hooks/useSearch";
 
 interface ImagesGridProps {
@@ -103,7 +104,7 @@ function Lightbox({
 export default function ImagesGrid({ images, mode = "grid" }: ImagesGridProps) {
     const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
     const [closing, setClosing] = useState(false);
-    const [showAll, setShowAll] = useState(false);
+
 
     if (!images || images.length === 0) return null;
 
@@ -112,7 +113,7 @@ export default function ImagesGrid({ images, mode = "grid" }: ImagesGridProps) {
 
     const displayImages = mode === "strip"
         ? allImages.slice(0, 6)
-        : showAll ? allImages : allImages.slice(0, 9);
+        : allImages;
 
     const openLightbox = useCallback((idx: number) => {
         setLightboxIndex(idx);
@@ -185,7 +186,7 @@ export default function ImagesGrid({ images, mode = "grid" }: ImagesGridProps) {
                     </div>
                 </div>
 
-                {lightboxImg && (
+                {lightboxImg && typeof document !== "undefined" && createPortal(
                     <Lightbox
                         img={lightboxImg}
                         index={lightboxIndex!}
@@ -194,7 +195,8 @@ export default function ImagesGrid({ images, mode = "grid" }: ImagesGridProps) {
                         onClose={closeLightbox}
                         onPrev={() => navigate(-1)}
                         onNext={() => navigate(1)}
-                    />
+                    />,
+                    document.body
                 )}
             </>
         );
@@ -233,17 +235,7 @@ export default function ImagesGrid({ images, mode = "grid" }: ImagesGridProps) {
                 ))}
             </div>
 
-            {!showAll && allImages.length > 9 && (
-                <button
-                    className="images-show-more-btn"
-                    onClick={() => setShowAll(true)}
-                    suppressHydrationWarning
-                >
-                    Show {allImages.length - 9} more images
-                </button>
-            )}
-
-            {lightboxImg && (
+            {lightboxImg && typeof document !== "undefined" && createPortal(
                 <Lightbox
                     img={lightboxImg}
                     index={lightboxIndex!}
@@ -252,7 +244,8 @@ export default function ImagesGrid({ images, mode = "grid" }: ImagesGridProps) {
                     onClose={closeLightbox}
                     onPrev={() => navigate(-1)}
                     onNext={() => navigate(1)}
-                />
+                />,
+                document.body
             )}
         </>
     );

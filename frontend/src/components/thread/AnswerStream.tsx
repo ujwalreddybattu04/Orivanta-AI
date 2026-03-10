@@ -19,6 +19,116 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { CornerDownRight } from "lucide-react";
 
+// ── Standalone sub-components so hooks are never called conditionally ──────
+
+const PROGRAMMING_LANGS = new Set(["python","javascript","typescript","js","ts","java","c","cpp","c++","rust","go","ruby","php","swift","kotlin","bash","sh","sql"]);
+
+function extractEmailText(raw: string): string {
+    return raw
+        .replace(/^def\s+\w+\([^)]*\):\s*/m, "")
+        .replace(/^\s*(email_body|body|template|text|content|email)\s*=\s*f?["']{1,3}/m, "")
+        .replace(/["']{1,3}\s*$/, "")
+        .replace(/^\s*return\s+\w+\s*$/m, "")
+        .replace(/^[ \t]{4}/gm, "")
+        .trim();
+}
+
+function EmailTemplateBlock({ codeString }: { codeString: string }) {
+    const [copied, setCopied] = useState(false);
+    const emailText = extractEmailText(codeString);
+    const copy = () => {
+        navigator.clipboard.writeText(emailText);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+    return (
+        <div className="answer-email-block">
+            <div className="answer-email-block-header">
+                <div className="answer-email-block-label">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                    <span>Email Template</span>
+                </div>
+                <button className="answer-copy-code-btn" onClick={copy}>
+                    {copied
+                        ? <><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copied</>
+                        : <><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg> Copy</>}
+                </button>
+            </div>
+            <pre className="answer-email-block-body">{emailText}</pre>
+        </div>
+    );
+}
+
+interface CodeBlockProps {
+    codeString: string;
+    language: string;
+    lineClass: string;
+    onRun: () => void;
+    onPreview: () => void;
+    canRun: boolean;
+    isHtml: boolean;
+}
+function SyntaxCodeBlock({ codeString, language, lineClass, onRun, onPreview, canRun, isHtml }: CodeBlockProps) {
+    const [copied, setCopied] = useState(false);
+    const copy = () => {
+        navigator.clipboard.writeText(codeString);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+    return (
+        <div className={`answer-code-container ${lineClass}`}>
+            <div className="answer-code-header">
+                <span className="answer-code-lang">{language || "code"}</span>
+                <div className="answer-code-header-actions">
+                    {isHtml && (
+                        <button className="answer-preview-btn" onClick={onPreview} title="Preview HTML">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                            Preview
+                        </button>
+                    )}
+                    {canRun && (
+                        <button className="answer-run-btn" onClick={onRun} title="Run code">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                                <polygon points="5 3 19 12 5 21 5 3" />
+                            </svg>
+                            Run
+                        </button>
+                    )}
+                    <button className="answer-copy-code-btn" onClick={copy}>
+                        {copied ? (
+                            <div className="answer-copy-code-success">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                <span>Copied</span>
+                            </div>
+                        ) : (
+                            <div className="answer-copy-code-default">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                                </svg>
+                                <span>Copy</span>
+                            </div>
+                        )}
+                    </button>
+                </div>
+            </div>
+            <SyntaxHighlighter
+                language={language || "text"}
+                style={oneDark}
+                customStyle={{ margin: 0, padding: "16px", background: "transparent", fontSize: "0.85rem", lineHeight: "1.6", borderRadius: "0 0 12px 12px" }}
+                wrapLongLines={true}
+                PreTag="div"
+            >
+                {codeString}
+            </SyntaxHighlighter>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 interface AnswerStreamProps {
     query?: string;
     content: string;
@@ -69,25 +179,36 @@ const AnswerStream = memo(({
     const sourcesPanelOpen = externalSourcesPanelOpen !== undefined ? externalSourcesPanelOpen : localSourcesPanelOpen;
     const setSourcesPanelOpen = externalSetSourcesPanelOpen !== undefined ? externalSetSourcesPanelOpen : setLocalSourcesPanelOpen;
 
-    // 1. Industry-Lead Citation Stripping: Aggressively remove [n], [n,m], etc.
-    // We prioritize keeping markdown structure (newlines, headers, tables) intact.
-    let processedContent = content;
+    // Process content while fully protecting code blocks (complete and in-progress during streaming).
+    // Strategy: split on code fence boundaries, only run text transforms on non-code segments.
+    let processedContent = (() => {
+        const input = content;
+        // Split into alternating [text, code, text, code, ...] segments on ``` boundaries
+        const parts = input.split(/(```[\s\S]*?```)/g);
+        return parts.map((part, idx) => {
+            // Even indices = prose, odd indices = fenced code blocks
+            if (idx % 2 === 1) return part; // code block — pass through untouched
 
-    // Remove brackets and potential trailing markdown link: [1], [1, 2], [1](citation:1), etc.
-    processedContent = processedContent.replace(/\\?\[\s*[\d,\s]+\s*\\?\](?:\([^\)]+\))?/g, '');
+            // For prose segments, also protect inline code
+            const inlines: string[] = [];
+            let prose = part.replace(/`[^`\n]+`/g, (m) => { inlines.push(m); return `\x00IC${inlines.length - 1}\x00`; });
 
-    // Remove hallucinated bold/superscript numbers: **1**, ^1^, etc.
-    processedContent = processedContent.replace(/\*\*(\d+)\*\*/g, '');
-    processedContent = processedContent.replace(/\^(\d+)\^/g, '');
+            // Citation bracket removal: [1], [1, 2], [1](citation:1)
+            prose = prose.replace(/\\?\[\s*[\d,\s]+\s*\\?\](?:\([^\)]+\))?/g, '');
+            // Bold/superscript hallucinated numbers: **1**, ^1^
+            prose = prose.replace(/\*\*(\d+)\*\*/g, '').replace(/\^(\d+)\^/g, '');
+            // Terminal citation number removal: "word 11." → "word." — only when digit is standalone (not a year/stat)
+            // Guards: must be 1-2 digits only, preceded by a letter, followed immediately by period/comma then space/end
+            // Do NOT match if followed by more digits (4.3), a letter (30%), or a word char
+            prose = prose.replace(/([a-zA-Z])\s+(\d{1,2})([\.,])(?=\s|$)(?!\d)/g, '$1$3');
+            // Collapse only mid-sentence duplicate spaces (never touches line-leading spaces)
+            prose = prose.replace(/([^\n]) {2,}([^\n])/g, '$1 $2');
 
-    // High-Precision Terminal Number Removal: Remove numbers like " word 11." but NOT "258.85"
-    // We only target 1-3 digits that are at the very end of a word followed by punctuation or space.
-    // We use a non-greedy approach that avoids matching decimals or years within sentences.
-    processedContent = processedContent.replace(/([a-zA-Z])\s+(\d{1,2})([\.,])(?=\s|$)/g, '$1$3');
-
-    // DO NOT flattend double spaces globally as it breaks Markdown structure (tables, etc.)
-    // Instead, just clean up spaces after we stripped brackets
-    processedContent = processedContent.replace(/ +(?= )/g, '');
+            // Restore inline code
+            prose = prose.replace(/\x00IC(\d+)\x00/g, (_, i) => inlines[parseInt(i)]);
+            return prose;
+        }).join('');
+    })();
 
     // Normalize any weird remaining bib fragments if streaming (prevent flicker)
     processedContent = processedContent.trim();
@@ -196,77 +317,28 @@ const AnswerStream = memo(({
                 const language = className ? className.replace("language-", "") : "";
 
                 if (isBlock) {
-                    const [copied, setCopied] = useState(false);
                     const codeString = String(children).replace(/\n$/, "");
                     const lang = language.toLowerCase();
+                    const hasEmailGreeting = /\b(Dear\s|Hello\s|Hi\s)/i.test(codeString);
+                    const hasEmailClosing = /\b(Sincerely,|Best regards,|Regards,|Yours truly,|Thank you,|Best,|Warm regards,)/i.test(codeString);
+                    const isWrappedEmail = PROGRAMMING_LANGS.has(lang) && hasEmailGreeting && hasEmailClosing;
+
+                    if (isWrappedEmail) {
+                        return <EmailTemplateBlock codeString={codeString} />;
+                    }
+
                     const isHtml = lang === "html" || lang === "htm" || lang === "svg";
                     const canRun = !isHtml && isRunnable(language);
-
-                    const copyCode = () => {
-                        navigator.clipboard.writeText(codeString);
-                        setCopied(true);
-                        setTimeout(() => setCopied(false), 2000);
-                    };
-
-                    const openRunner  = () => setRunnerStateRef.current({ code: codeString, language });
-                    const openPreview = () => setPreviewCodeRef.current(codeString);
-
                     return (
-                        <div className={`answer-code-container ${lineClass}`}>
-                            <div className="answer-code-header">
-                                <span className="answer-code-lang">{language || "code"}</span>
-                                <div className="answer-code-header-actions">
-                                    {isHtml && (
-                                        <button className="answer-preview-btn" onClick={openPreview} title="Preview HTML">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
-                                                <circle cx="12" cy="12" r="3"/>
-                                            </svg>
-                                            Preview
-                                        </button>
-                                    )}
-                                    {canRun && (
-                                        <button className="answer-run-btn" onClick={openRunner} title="Run code">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-                                                <polygon points="5 3 19 12 5 21 5 3" />
-                                            </svg>
-                                            Run
-                                        </button>
-                                    )}
-                                    <button className="answer-copy-code-btn" onClick={copyCode}>
-                                        {copied ? (
-                                            <div className="answer-copy-code-success">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                <span>Copied</span>
-                                            </div>
-                                        ) : (
-                                            <div className="answer-copy-code-default">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-                                                </svg>
-                                                <span>Copy</span>
-                                            </div>
-                                        )}
-                                    </button>
-                                </div>
-                            </div>
-                            <SyntaxHighlighter
-                                language={language || "text"}
-                                style={oneDark}
-                                customStyle={{
-                                    margin: 0,
-                                    padding: '16px',
-                                    background: 'transparent',
-                                    fontSize: '0.85rem',
-                                    lineHeight: '1.6',
-                                    borderRadius: '0 0 12px 12px',
-                                }}
-                                wrapLongLines={true}
-                                PreTag="div"
-                            >
-                                {codeString}
-                            </SyntaxHighlighter>
-                        </div>
+                        <SyntaxCodeBlock
+                            codeString={codeString}
+                            language={language}
+                            lineClass={lineClass}
+                            onRun={() => setRunnerStateRef.current({ code: codeString, language })}
+                            onPreview={() => setPreviewCodeRef.current(codeString)}
+                            canRun={canRun}
+                            isHtml={isHtml}
+                        />
                     );
                 }
                 return <code className="answer-code-inline">{children}</code>;

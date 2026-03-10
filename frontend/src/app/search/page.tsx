@@ -414,27 +414,11 @@ function SearchPageContent() {
                             {/* === IMAGES TAB === */}
                             {activeTab === "images" && (
                                 <div className="sp-images-tab">
-                                    {/* History turns */}
-                                    {history && history.map((turn, idx) => (
-                                        turn.images && turn.images.length > 0 && (
-                                            <div key={idx} className="sp-thread-turn">
-                                                <div className="sp-query-bubble">{turn.query}</div>
-                                                <ImagesGrid images={turn.images} mode="grid" />
-                                            </div>
-                                        )
-                                    ))}
-
-                                    {/* Current turn */}
-                                    {(isConnecting || isStreaming || answer || images.length > 0) && (
-                                        <div className="sp-thread-turn">
-                                            <div className="sp-query-bubble">{currentQuery}</div>
-                                            {images.length > 0 ? (
-                                                <ImagesGrid images={images} mode="grid" />
-                                            ) : (
-                                                <div className="sp-images-loading">
-                                                    {isConnecting || isStreaming ? "Searching for images..." : "No images found."}
-                                                </div>
-                                            )}
+                                    {images.length > 0 ? (
+                                        <ImagesGrid images={images} mode="grid" />
+                                    ) : (
+                                        <div className="sp-images-loading">
+                                            {isConnecting || isStreaming ? "Searching for images..." : "No images found."}
                                         </div>
                                     )}
                                 </div>
