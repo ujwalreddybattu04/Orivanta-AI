@@ -11,6 +11,7 @@ import { Sparkles, Globe, Image as ImageIcon, Pencil, Copy, Check, CornerDownRig
 import { Favicon } from "@/components/common";
 import ThreadMenu from "@/components/thread/ThreadMenu";
 import ShareModal from "@/components/thread/ShareModal";
+import GroupThreadModal from "@/components/thread/GroupThreadModal";
 
 function SearchPageContent() {
     const searchParams = useSearchParams();
@@ -26,6 +27,7 @@ function SearchPageContent() {
     const [copied, setCopied] = useState(false);
     const [copiedQueryId, setCopiedQueryId] = useState<string | null>(null);
     const [shareOpen, setShareOpen] = useState(false);
+    const [groupThreadOpen, setGroupThreadOpen] = useState(false);
     const [editingQueryId, setEditingQueryId] = useState<string | null>(null);
     const [editingQueryText, setEditingQueryText] = useState("");
 
@@ -194,6 +196,19 @@ function SearchPageContent() {
                                     onDelete={() => router.push("/")}
                                     onRename={() => {}}
                                 />
+                                <button
+                                    className="gt-btn"
+                                    onClick={() => setGroupThreadOpen(true)}
+                                    title="Start a group thread"
+                                >
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                        <circle cx="9" cy="7" r="4"/>
+                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                                    </svg>
+                                    Group
+                                </button>
                                 <button
                                     className="sp-share-btn"
                                     onClick={() => setShareOpen(true)}
@@ -501,6 +516,14 @@ function SearchPageContent() {
         <ShareModal
             isOpen={shareOpen}
             onClose={() => setShareOpen(false)}
+            query={currentQuery}
+            answer={answer}
+        />
+
+        {/* Group Thread Modal */}
+        <GroupThreadModal
+            isOpen={groupThreadOpen}
+            onClose={() => setGroupThreadOpen(false)}
             query={currentQuery}
             answer={answer}
         />

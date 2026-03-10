@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Pin, PinOff, MoreHorizontal, Eraser, Trash2, Edit3 } from "lucide-react";
+import { Pin, PinOff, MoreHorizontal, Eraser, Trash2, Edit3, Users } from "lucide-react";
 import { BRAND_NAME, STORAGE_KEYS, EVENTS } from "@/config/constants";
 
 const NAV_ITEMS = [
@@ -59,6 +59,8 @@ export default function Sidebar() {
     const [threads, setThreads] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
 
+    const [groupThreads, setGroupThreads] = useState<Array<{ token: string; label: string; memberId: string }>>([]);
+
     // Thread management state
     const [pinnedThreadIds, setPinnedThreadIds] = useState<string[]>([]);
     const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
@@ -94,6 +96,11 @@ export default function Sidebar() {
 
                 if (pinsJson) {
                     setPinnedThreadIds(JSON.parse(pinsJson));
+                }
+
+                const gtJson = localStorage.getItem("corten_group_threads");
+                if (gtJson) {
+                    setGroupThreads(JSON.parse(gtJson));
                 }
             } catch (e) {
                 console.error("Failed to load threads", e);
@@ -373,6 +380,32 @@ export default function Sidebar() {
                         )}
                     </div>
                 </div>
+
+                {/* Group Threads Section */}
+                {groupThreads.length > 0 && (
+                    <>
+                        <div className="sidebar-divider" />
+                        <div className="sidebar-section">
+                            <div className="sidebar-section-title" style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                                <Users size={10} />
+                                GROUP THREADS
+                            </div>
+                            <div className="sidebar-group-threads">
+                                {groupThreads.slice(0, 5).map((gt) => (
+                                    <Link
+                                        key={gt.token}
+                                        href={`/group/${gt.token}?member_id=${gt.memberId}`}
+                                        className="sidebar-group-thread-item"
+                                        title={gt.label}
+                                    >
+                                        <span className="sidebar-group-thread-dot" />
+                                        <span className="sidebar-group-thread-label">{gt.label}</span>
+                                    </Link>
+                                ))}
+                            </div>
+                        </div>
+                    </>
+                )}
 
                 {/* Footer */}
                 <div className="sidebar-footer">

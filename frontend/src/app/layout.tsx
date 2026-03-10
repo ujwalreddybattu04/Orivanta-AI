@@ -11,6 +11,7 @@ import "@/styles/share.css";
 import "@/styles/components/PrivateToggle.css";
 import "@/styles/code-runner.css";
 import "@/styles/html-preview.css";
+import "@/styles/group-thread.css";
 import { Suspense } from "react";
 import { Sidebar } from "@/components/layout";
 import { SITE_TITLE, SITE_DESCRIPTION } from "@/config/constants";
