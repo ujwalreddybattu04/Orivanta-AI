@@ -2,6 +2,7 @@
 Application lifecycle event handlers.
 """
 
+import asyncio
 import logging
 from fastapi import FastAPI
 from src.config.settings import settings
@@ -17,7 +18,7 @@ def create_start_app_handler(app: FastAPI):
         try:
             from src.db.redis import get_redis
             redis = await get_redis()
-            await redis.ping()
+            await asyncio.wait_for(redis.ping(), timeout=3.0)
             logger.info("Redis connected successfully")
         except Exception as e:
             logger.warning("Redis connection failed at startup (continuing): %s", e)
