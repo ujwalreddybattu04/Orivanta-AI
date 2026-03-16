@@ -284,6 +284,7 @@ export default function ThreadMenu({
                     aria-label="Thread options"
                     aria-expanded={open}
                     aria-haspopup="menu"
+                    suppressHydrationWarning
                 >
                     <MoreHorizontal size={15} strokeWidth={2} />
                 </button>

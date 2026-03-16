@@ -3,7 +3,7 @@ API v1 — Router aggregator. All v1 endpoints are registered here.
 """
 
 from fastapi import APIRouter
-from src.api.v1 import search, threads, spaces, collections, discover, auth, users, group_threads
+from src.api.v1 import search, threads, spaces, collections, discover, auth, users
 
 api_router = APIRouter()
 
@@ -14,4 +14,3 @@ api_router.include_router(collections.router, prefix="/collections", tags=["Coll
 api_router.include_router(discover.router, prefix="/discover", tags=["Discover"])
 api_router.include_router(auth.router, prefix="/auth", tags=["Auth"])
 api_router.include_router(users.router, prefix="/users", tags=["Users"])
-api_router.include_router(group_threads.router, prefix="/group-threads", tags=["Group Threads"])

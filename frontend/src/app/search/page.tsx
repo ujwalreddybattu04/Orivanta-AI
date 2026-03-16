@@ -11,7 +11,45 @@ import { Sparkles, Globe, Image as ImageIcon, Pencil, Copy, Check, CornerDownRig
 import { Favicon } from "@/components/common";
 import ThreadMenu from "@/components/thread/ThreadMenu";
 import ShareModal from "@/components/thread/ShareModal";
-import GroupThreadModal from "@/components/thread/GroupThreadModal";
+
+function cleanSnippet(text: string): string {
+    const cleaned = text
+        .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')                              // images → space
+        .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1 ')                           // [text](url) → text
+        .replace(/\[[^\]]*\]/g, ' ')                                        // orphan brackets
+        .replace(/https?:\/\/\S+/g, ' ')                                    // bare URLs (space to prevent word-joining)
+        .replace(/#{1,6}\s*/g, '')                                          // headings
+        .replace(/\*{2}([^*\n]+)\*{2}/g, '$1')                             // **bold**
+        .replace(/\*([^*\n]+)\*/g, '$1')                                    // *italic*
+        .replace(/\*+/g, ' ')                                               // leftover asterisks
+        .replace(/`[^`]+`/g, '')                                            // inline code
+        // Navigation / boilerplate patterns
+        .replace(/Skip to (main )?content\.?/gi, '')
+        .replace(/\bISSN[:\s]+[\d\-X]+/gi, '')                             // ISSN numbers
+        .replace(/\bVol\.\s*\d+.*?(?=\.|$)/gi, '')                        // Vol. 11, Issue: 5...
+        .replace(/(\s*\.\s*){3,}/g, '. ')                                   // ". . . ." → ". "
+        .replace(/(\s+[A-Z][a-z]*\.?\s*){5,}/g, ' ')                      // nav word lists
+        .replace(/\|/g, ' ')
+        .replace(/\n+/g, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .replace(/^[\s.,]+/, '')                                            // leading junk
+        .trim();
+
+    // If the snippet still looks like navigation junk (many short words), return empty
+    const wordList = cleaned.split(' ');
+    const shortWordRatio = wordList.filter(w => w.length <= 3).length / (wordList.length || 1);
+    if (shortWordRatio > 0.6 && wordList.length > 5) return '';
+
+    if (cleaned.length <= 220) return cleaned;
+    return cleaned.slice(0, 220).replace(/\s+\S*$/, '') + '…';
+}
+
+function cleanTitle(text: string): string {
+    return text
+        .replace(/^\[PDF\]\s*/i, '')        // [PDF] prefix
+        .replace(/\s*\|\s*$/, '')           // trailing pipe
+        .trim();
+}
 
 function SearchPageContent() {
     const searchParams = useSearchParams();
@@ -27,7 +65,6 @@ function SearchPageContent() {
     const [copied, setCopied] = useState(false);
     const [copiedQueryId, setCopiedQueryId] = useState<string | null>(null);
     const [shareOpen, setShareOpen] = useState(false);
-    const [groupThreadOpen, setGroupThreadOpen] = useState(false);
     const [editingQueryId, setEditingQueryId] = useState<string | null>(null);
     const [editingQueryText, setEditingQueryText] = useState("");
 
@@ -196,19 +233,6 @@ function SearchPageContent() {
                                     onDelete={() => router.push("/")}
                                     onRename={() => {}}
                                 />
-                                <button
-                                    className="gt-btn"
-                                    onClick={() => setGroupThreadOpen(true)}
-                                    title="Start a group thread"
-                                >
-                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                                        <circle cx="9" cy="7" r="4"/>
-                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                                    </svg>
-                                    Group
-                                </button>
                                 <button
                                     className="sp-share-btn"
                                     onClick={() => setShareOpen(true)}
@@ -416,7 +440,7 @@ function SearchPageContent() {
                                                         <div className="sp-link-content">
                                                             <div className="sp-link-meta">{src.domain?.replace(/^www\./, '')}</div>
                                                             <div className="sp-link-title">{src.title}</div>
-                                                            {src.snippet && <div className="sp-link-snippet">{src.snippet}</div>}
+                                                            {src.snippet && <div className="sp-link-snippet">{cleanSnippet(src.snippet)}</div>}
                                                         </div>
                                                     </div>
                                                 </a>
@@ -493,9 +517,9 @@ function SearchPageContent() {
                                             {(src.domain || '').replace(/^www\./, '')}
                                         </div>
                                     </div>
-                                    <div className="sp-source-item-title">{src.title}</div>
-                                    {src.snippet && (
-                                        <div className="sp-source-item-snippet">{src.snippet}</div>
+                                    <div className="sp-source-item-title">{cleanTitle(src.title || '')}</div>
+                                    {src.snippet && cleanSnippet(src.snippet) && (
+                                        <div className="sp-source-item-snippet">{cleanSnippet(src.snippet)}</div>
                                     )}
                                 </a>
                             ))}
@@ -516,18 +540,11 @@ function SearchPageContent() {
         <ShareModal
             isOpen={shareOpen}
             onClose={() => setShareOpen(false)}
-            query={currentQuery}
+            query={currentQuery ?? ""}
             answer={answer}
         />
 
-        {/* Group Thread Modal */}
-        <GroupThreadModal
-            isOpen={groupThreadOpen}
-            onClose={() => setGroupThreadOpen(false)}
-            query={currentQuery}
-            answer={answer}
-        />
-        </>
+</>
     );
 }
 

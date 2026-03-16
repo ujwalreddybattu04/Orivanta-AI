@@ -1398,7 +1398,8 @@ input:focus-visible {
     max-height: 100vh;
     min-height: 0;
     width: 480px;
-    min-width: 480px;
+    min-width: 0;
+    max-width: 480px;
     border-left: 1px solid rgba(255, 255, 255, 0.06);
     background: #0a0a0a;
     overflow: hidden;
@@ -1516,11 +1517,12 @@ input:focus-visible {
 .sp-sources-panel-list {
     flex: 1;
     overflow-y: auto;
-    padding: 16px 20px 24px;
+    overflow-x: hidden;
+    padding: 12px 16px 24px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    /* Tighter list */
+    gap: 6px;
+    min-width: 0;
 }
 
 .sp-sources-panel-list::-webkit-scrollbar {
@@ -1544,16 +1546,23 @@ input:focus-visible {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 6px;
+    gap: 5px;
     padding: 12px 14px;
     text-decoration: none;
-    transition: background 0.15s ease;
-    border-radius: 8px;
+    transition: background 0.15s ease, border-color 0.15s ease;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.02);
     cursor: pointer;
+    min-width: 0;
+    overflow: hidden;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .sp-source-item:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
 }
 
 .sp-source-item-top {
@@ -1561,6 +1570,8 @@ input:focus-visible {
     align-items: center;
     gap: 8px;
     width: 100%;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .sp-source-item-icon {
@@ -1596,15 +1607,13 @@ input:focus-visible {
 }
 
 .sp-source-item-title {
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 600;
     color: rgba(255, 255, 255, 0.95);
-    line-height: 1.4;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+    line-height: 1.45;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    max-width: 100%;
     transition: color 0.15s ease;
 }
 
@@ -1613,19 +1622,17 @@ input:focus-visible {
 }
 
 .sp-source-item-snippet {
-    font-size: 0.8rem;
-    color: rgba(255, 255, 255, 0.32);
-    line-height: 1.4;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    margin-top: 2px;
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.5);
+    line-height: 1.5;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    margin-top: 1px;
+    max-width: 100%;
 }
 
 .sp-source-item:hover .sp-source-item-snippet {
-    color: rgba(255, 255, 255, 0.42);
+    color: rgba(255, 255, 255, 0.6);
 }
 
 /* ── Empty state ── */

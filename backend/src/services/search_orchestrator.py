@@ -8,8 +8,12 @@ from src.services.llm_service import groq_llm_service
 from src.services.query_router import query_router
 from src.services.serper_image_service import serper_image_service
 from src.config.settings import settings
+from src.db.redis import cache_get, cache_set, make_search_cache_key
 
 logger = logging.getLogger(__name__)
+
+# Cache TTLs: search results are time-sensitive, so keep short
+_SEARCH_CACHE_TTL = 300  # 5 minutes — enough to dedup rapid re-queries
 
 class SearchOrchestrator:
     async def stream_search(self, query: str, focus_mode: str = "all", messages: list = None) -> AsyncGenerator[str, None]:
@@ -33,7 +37,19 @@ class SearchOrchestrator:
 
             # --- PHASE 0: SPECULATIVE LAUNCH ---
             route_task = asyncio.create_task(query_router.route_query(query))
-            search_task = asyncio.create_task(tavily_search_service.search(query, max_results=settings.MAX_SEARCH_RESULTS + 2))
+
+            # Check Redis cache for recent identical search results (saves Tavily API cost)
+            _search_cache_key = make_search_cache_key(query, focus_mode)
+            _cached_search = await cache_get(_search_cache_key)
+
+            if _cached_search:
+                logger.info("Cache HIT for query='%s' focus='%s'", query, focus_mode)
+                async def _return_cached():
+                    return _cached_search
+                search_task = asyncio.create_task(_return_cached())
+            else:
+                search_task = asyncio.create_task(tavily_search_service.search(query, max_results=settings.MAX_SEARCH_RESULTS + 2))
+
             plan_task = asyncio.create_task(groq_llm_service.generate_research_plan(query))
             # Fire image search in parallel — runs while Tavily + LLM are working
             image_task = asyncio.create_task(serper_image_service.search_images(query, num=20))
@@ -72,6 +88,9 @@ class SearchOrchestrator:
                 search_results = []
             else:
                 search_results = search_data.get("results", [])[:settings.MAX_SEARCH_RESULTS]
+                # Store in Redis cache if this was a live API call
+                if not _cached_search and search_results:
+                    await cache_set(_search_cache_key, search_data, ttl=_SEARCH_CACHE_TTL)
 
             # Format and yield sources immediately
             frontend_sources = []
