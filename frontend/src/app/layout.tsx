@@ -12,6 +12,7 @@ import "@/styles/components/PrivateToggle.css";
 import "@/styles/code-runner.css";
 import "@/styles/html-preview.css";
 import "@/styles/auth.css";
+import "@/styles/discover.css";
 import { Suspense } from "react";
 import { Sidebar } from "@/components/layout";
 import { SITE_TITLE, SITE_DESCRIPTION } from "@/config/constants";

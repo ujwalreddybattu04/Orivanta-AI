@@ -57,6 +57,8 @@ function SearchPageContent() {
     const query = searchParams.get("q") || "";
     const focusMode = searchParams.get("focus") || "all";
     const threadId = searchParams.get("id") || undefined;
+    const fromArticle = searchParams.get("fromArticle") || "";
+    const fromArticleImg = searchParams.get("fromArticleImg") || "";
     const [followUp, setFollowUp] = useState("");
     const [activeTab, setActiveTab] = useState<"answer" | "links" | "images">("answer");
     const [sourcesPanelOpen, setSourcesPanelOpen] = useState(false);
@@ -249,6 +251,22 @@ function SearchPageContent() {
                             {/* === ANSWER TAB === */}
                             {activeTab === "answer" && (
                                 <div className="sp-thread-container">
+                                    {/* Follow-up context card (from Discover article) */}
+                                    {fromArticle && (
+                                        <div className="sp-from-article-card">
+                                            <CornerDownRight size={13} className="sp-from-article-icon" />
+                                            <span className="sp-from-article-label">Follow up to</span>
+                                            {fromArticleImg && (
+                                                <img
+                                                    src={fromArticleImg}
+                                                    alt=""
+                                                    className="sp-from-article-img"
+                                                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                                                />
+                                            )}
+                                            <span className="sp-from-article-title">{fromArticle}</span>
+                                        </div>
+                                    )}
                                     {/* 1. History Turns */}
                                     {history && history.map((turn, idx) => (
                                         <motion.div

@@ -105,6 +105,27 @@ TITLE_SYSTEM_PROMPT = (
     "Do not use quotes, punctuation, or conversational fillers."
 )
 
+# Article Summary (Perplexity-style narrative)
+ARTICLE_SUMMARY_SYSTEM_PROMPT = (
+    "You are a world-class journalist and analyst. Your task is to write an in-depth, engaging summary of a news article.\n\n"
+    "WRITING STYLE:\n"
+    "- Write in a flowing, narrative style like a premium newspaper feature (NYT, The Guardian, Bloomberg).\n"
+    "- Use smooth prose paragraphs — NOT bullet points, NOT Q&A format, NOT listicles.\n"
+    "- Open with a compelling lead paragraph that captures the core story.\n"
+    "- Weave in specific facts, data, numbers, and quotes naturally within the prose.\n"
+    "- Use short, punchy paragraphs (2-4 sentences each) for readability.\n"
+    "- Transition smoothly between ideas — the piece should read like one cohesive story.\n"
+    "- End with implications, what to watch next, or broader context.\n\n"
+    "FORMATTING RULES:\n"
+    "- Use ## for 2-3 section headings MAX to break up a long piece — but these should read like editorial section titles (e.g., 'The Race to the Front Row', 'What This Means for the Championship'), NOT like report headers.\n"
+    "- Bold only names or key terms sparingly — do NOT bold every other word.\n"
+    "- Use inline citations [1], [2] etc. after factual claims. Place them naturally at the end of sentences.\n"
+    "- NEVER create a Sources/References section at the end.\n"
+    "- NEVER use bullet-point lists for the main content.\n"
+    "- NEVER start with 'Here is a summary' or 'This article discusses' — just start telling the story.\n\n"
+    "CONTEXT DATA:\n"
+)
+
 # Follow-Up Question Generator
 FOLLOW_UP_SYSTEM_PROMPT = (
     "You are a Curiosity Engine. Given a user's original query and the context of the search results, "

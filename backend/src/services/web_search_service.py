@@ -65,4 +65,28 @@ class TavilySearchService:
                 raise Exception("Tavily API usage limit reached. Please check your search provider plan.") from e
             return {"results": [], "images": []}
 
+    async def extract(self, url: str) -> str:
+        """
+        Extract the full text content from a URL using Tavily Extract API.
+        Returns the raw text content of the page.
+        """
+        if not self.client:
+            logger.error("Attempted to extract without Tavily API key.")
+            return ""
+
+        try:
+            logger.info(f"Extracting content from: {url}")
+            response = await self.client.extract(urls=[url])
+
+            if not response or not isinstance(response, dict):
+                return ""
+
+            results = response.get("results", [])
+            if results and len(results) > 0:
+                return results[0].get("raw_content", "") or results[0].get("text", "")
+            return ""
+        except Exception as e:
+            logger.warning(f"Tavily extract failed for {url}: {e}")
+            return ""
+
 tavily_search_service = TavilySearchService()

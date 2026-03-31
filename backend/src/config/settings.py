@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     DEFAULT_MODEL: str = "llama-3.1-8b-instant"
     ROUTER_MODEL: str = "llama-3.1-8b-instant"
 
+    # --- Discover / News ---
+    NEWSAPI_KEY: str = ""
+    GUARDIAN_API_KEY: str = ""
+    OPENWEATHER_API_KEY: str = ""
+
     # --- Web Search ---
     MAX_SEARCH_RESULTS: int = 10
     BRAVE_SEARCH_API_KEY: str = ""

@@ -5,7 +5,7 @@ from typing import AsyncGenerator, Dict, Any, List
 
 from groq import AsyncGroq
 from src.config.settings import settings
-from src.config.prompts import RAG_SYSTEM_PROMPT, DIRECT_SYSTEM_PROMPT, PLANNING_SYSTEM_PROMPT, TITLE_SYSTEM_PROMPT, FOLLOW_UP_SYSTEM_PROMPT
+from src.config.prompts import RAG_SYSTEM_PROMPT, DIRECT_SYSTEM_PROMPT, PLANNING_SYSTEM_PROMPT, TITLE_SYSTEM_PROMPT, FOLLOW_UP_SYSTEM_PROMPT, ARTICLE_SUMMARY_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ class GroqLLMService:
                 messages=messages_payload,
                 model=self.default_model,
                 temperature=0.2, # Low temperature for factual RAG
-                max_tokens=2048,
+                max_tokens=8192,
                 stream=True,
                 stop=[
                     "\n\n**Sources", "\n\nSources", "\n[", "\n- ["
@@ -83,6 +83,106 @@ class GroqLLMService:
                     
         except Exception as e:
             logger.exception(f"Groq API streaming failed: {e}")
+            raise e
+
+    async def stream_article_summary(self, title: str, article_text: str, search_results: List[Dict[str, Any]], description: str = "") -> AsyncGenerator[str, None]:
+        """
+        Streams a narrative-style article summary using a dedicated journalist prompt.
+        """
+        if not self.client:
+            yield "LLM generation failed because Groq API key is missing."
+            return
+
+        # Build the article-specific system prompt with source context
+        system_prompt = ARTICLE_SUMMARY_SYSTEM_PROMPT
+        for idx, result in enumerate(search_results[:6], start=1):
+            snippet = result.get('snippet', '')[:1000]
+            system_prompt += f"Source [{idx}]:\n"
+            system_prompt += f"Title: {result.get('title', 'N/A')}\n"
+            system_prompt += f"Content: {snippet}\n\n"
+
+        # Build the user message with article content
+        user_content = f"Write an in-depth summary of this story: \"{title}\"\n\n"
+        if article_text:
+            user_content += f"FULL ARTICLE TEXT:\n{article_text[:5000]}\n\n"
+        if description:
+            user_content += f"ARTICLE EXCERPT: {description}\n\n"
+        user_content += "Write a compelling, flowing narrative summary. Tell the story. Keep it focused and conclude cleanly — do not let the piece trail off."
+
+        messages_payload = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content},
+        ]
+
+        try:
+            stream = await self.client.chat.completions.create(
+                messages=messages_payload,
+                model=self.default_model,
+                temperature=0.4,
+                max_tokens=8192,
+                stream=True,
+                stop=["\n\n**Sources", "\n\nSources", "\n\nReferences"],
+            )
+
+            async for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content is not None:
+                    yield chunk.choices[0].delta.content
+
+        except Exception as e:
+            logger.exception(f"Groq API article summary streaming failed: {e}")
+            raise e
+
+    async def stream_article_followup(self, title: str, followup: str, previous_summary: str, search_results: List[Dict[str, Any]]) -> AsyncGenerator[str, None]:
+        """
+        Streams a follow-up answer about a specific article.
+        The LLM knows the article title, the previous summary, and the user's question.
+        """
+        if not self.client:
+            yield "LLM generation failed because Groq API key is missing."
+            return
+
+        system_prompt = (
+            "You are a knowledgeable journalist assistant. The user is reading an article and asking follow-up questions about it.\n\n"
+            f"ARTICLE: \"{title}\"\n\n"
+        )
+        if previous_summary:
+            system_prompt += f"YOUR PREVIOUS SUMMARY OF THIS ARTICLE:\n{previous_summary[:3000]}\n\n"
+
+        system_prompt += (
+            "RULES:\n"
+            "- Answer the user's question specifically about THIS article. They are referring to THIS story.\n"
+            "- Use the article context and search results to give a thorough, accurate answer.\n"
+            "- Write in clear, flowing prose. Be conversational but informative.\n"
+            "- Use inline citations [1], [2] when referencing sources.\n"
+            "- NEVER add a Sources/References section at the end.\n"
+            "- If the user asks to 'explain' or 'simplify', rewrite the content in plain language.\n\n"
+            "CONTEXT DATA:\n"
+        )
+        for idx, result in enumerate(search_results[:6], start=1):
+            snippet = result.get('snippet', '')[:1000]
+            system_prompt += f"Source [{idx}]:\nTitle: {result.get('title', 'N/A')}\nContent: {snippet}\n\n"
+
+        messages_payload = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": followup},
+        ]
+
+        try:
+            stream = await self.client.chat.completions.create(
+                messages=messages_payload,
+                model=self.default_model,
+                temperature=0.4,
+                max_tokens=8192,
+                stream=True,
+                stop=["\n\n**Sources", "\n\nSources", "\n\nReferences"],
+            )
+
+            async for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content is not None:
+                    yield chunk.choices[0].delta.content
+
+        except Exception as e:
+            logger.exception(f"Groq API article follow-up streaming failed: {e}")
             raise e
 
     async def generate_research_plan(self, query: str) -> Dict[str, Any]:

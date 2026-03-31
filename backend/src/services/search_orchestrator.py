@@ -186,4 +186,178 @@ class SearchOrchestrator:
             yield f"data: {json.dumps(error_event)}\n\n"
             yield "data: {\"type\":\"done\"}\n\n"
 
+    async def stream_article_summary(self, title: str, url: str, description: str = "", followup: str = "", previous_summary: str = "") -> AsyncGenerator[str, None]:
+        """
+        Perplexity-style article summarization + follow-up handling:
+        - Initial: Extract article content → web search → AI summary
+        - Follow-up: Use article context + previous summary to answer in-context
+        """
+        if not title.strip():
+            yield "data: {\"type\":\"error\",\"message\":\"Title cannot be empty\"}\n\n"
+            yield "data: {\"type\":\"done\"}\n\n"
+            return
+
+        try:
+            import time
+            start_time = time.time()
+
+            # ── FOLLOW-UP PATH: user asks a question about the article ──
+            if followup:
+                logger.info(f"Article follow-up for '{title}': {followup}")
+                yield f"data: {json.dumps({'type': 'status', 'content': 'Thinking...'})}\n\n"
+                yield f"data: {json.dumps({'type': 'query_step', 'content': followup})}\n\n"
+
+                # Search for follow-up context
+                search_task = asyncio.create_task(
+                    tavily_search_service.search(f"{title} {followup}", max_results=settings.MAX_SEARCH_RESULTS)
+                )
+
+                search_data = await search_task
+                search_results = []
+                if isinstance(search_data, dict):
+                    search_results = search_data.get("results", [])[:settings.MAX_SEARCH_RESULTS]
+
+                yield f"data: {json.dumps({'type': 'thought', 'content': f'Found {len(search_results)} sources'})}\n\n"
+
+                # Format sources
+                frontend_sources = []
+                for idx, res in enumerate(search_results, start=1):
+                    domain = res.get("domain", "website")
+                    frontend_sources.append({
+                        "url": res.get("url"),
+                        "title": res.get("title") or "Source",
+                        "domain": domain,
+                        "favicon": f"https://www.google.com/s2/favicons?domain={domain}&sz=128",
+                        "snippet": res.get("snippet") or "",
+                        "citationIndex": idx,
+                    })
+                yield f"data: {json.dumps({'type': 'sources', 'sources': frontend_sources, 'items': frontend_sources})}\n\n"
+
+                thought_time = time.time() - start_time
+                yield f"data: {json.dumps({'type': 'thought_time', 'time': round(thought_time, 1)})}\n\n"
+                yield f"data: {json.dumps({'type': 'status', 'content': 'Writing answer'})}\n\n"
+
+                # Build context with article info + previous summary
+                enriched_results = search_results.copy()
+                if previous_summary:
+                    enriched_results.insert(0, {
+                        "title": f"Previous AI Summary of: {title}",
+                        "url": url,
+                        "snippet": previous_summary[:3000],
+                        "domain": "previous-summary",
+                    })
+
+                async for chunk in groq_llm_service.stream_article_followup(
+                    title=title,
+                    followup=followup,
+                    previous_summary=previous_summary,
+                    search_results=enriched_results,
+                ):
+                    yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
+
+                yield "data: {\"type\":\"done\"}\n\n"
+                return
+
+            # ── INITIAL SUMMARY PATH ──
+            logger.info(f"Article summary for: {title}")
+
+            yield f"data: {json.dumps({'type': 'status', 'content': 'Reading article...'})}\n\n"
+
+            # --- PHASE 1: PARALLEL FETCH — article content + web search + images ---
+            extract_task = asyncio.create_task(tavily_search_service.extract(url)) if url else None
+            search_task = asyncio.create_task(
+                tavily_search_service.search(title, max_results=settings.MAX_SEARCH_RESULTS)
+            )
+            image_task = asyncio.create_task(serper_image_service.search_images(title, num=10))
+
+            yield f"data: {json.dumps({'type': 'query_step', 'content': title})}\n\n"
+            yield f"data: {json.dumps({'type': 'status', 'content': 'Searching for context'})}\n\n"
+
+            # Await article extraction
+            article_text = ""
+            if extract_task:
+                try:
+                    article_text = await asyncio.wait_for(extract_task, timeout=8)
+                    if article_text:
+                        yield f"data: {json.dumps({'type': 'thought', 'content': 'Extracted article content'})}\n\n"
+                except Exception as e:
+                    logger.warning(f"Article extraction failed: {e}")
+
+            # Await web search
+            search_data = await search_task
+            search_results = []
+            if isinstance(search_data, dict):
+                search_results = search_data.get("results", [])[:settings.MAX_SEARCH_RESULTS]
+
+            yield f"data: {json.dumps({'type': 'thought', 'content': f'Found {len(search_results)} additional sources'})}\n\n"
+
+            # Format and yield sources
+            frontend_sources = []
+            for idx, res in enumerate(search_results, start=1):
+                domain = res.get("domain", "website")
+                frontend_sources.append({
+                    "url": res.get("url"),
+                    "title": res.get("title") or "Source",
+                    "domain": domain,
+                    "favicon": f"https://www.google.com/s2/favicons?domain={domain}&sz=128",
+                    "snippet": res.get("snippet") or "",
+                    "citationIndex": idx,
+                })
+
+            yield f"data: {json.dumps({'type': 'sources', 'sources': frontend_sources, 'items': frontend_sources})}\n\n"
+
+            # --- PHASE 2: BUILD CONTEXT & STREAM LLM ---
+            thought_time = time.time() - start_time
+            yield f"data: {json.dumps({'type': 'thought_time', 'time': round(thought_time, 1)})}\n\n"
+            yield f"data: {json.dumps({'type': 'status', 'content': 'Writing summary'})}\n\n"
+
+            # Build enriched source list for the LLM context
+            enriched_results = search_results.copy()
+            if article_text:
+                enriched_results.insert(0, {
+                    "title": title,
+                    "url": url,
+                    "snippet": article_text[:2000],
+                    "domain": "original-article",
+                })
+
+            # Use dedicated article summary LLM method (narrative journalist style)
+            import re
+            buffer = ""
+            cutoff_pattern = re.compile(
+                r'(?:\n+|^)\s*(?:(?:\*\*|### |# )?(?:Sources|References|Bibliography)(?:\*\*|:)?|'
+                r'(?:\[[^\]]+\]\(https?://[^\s\)]+\)\s*){2,})',
+                re.IGNORECASE,
+            )
+
+            async for chunk in groq_llm_service.stream_article_summary(
+                title=title,
+                article_text=article_text,
+                search_results=enriched_results,
+                description=description,
+            ):
+                buffer += chunk
+                search_window = buffer[-150:] if len(buffer) > 150 else buffer
+                if cutoff_pattern.search(search_window):
+                    break
+                yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
+
+            # --- PHASE 3: IMAGES ---
+            try:
+                search_images = await image_task
+                if search_images:
+                    yield f"data: {json.dumps({'type': 'images', 'images': search_images})}\n\n"
+            except Exception:
+                pass
+
+            yield "data: {\"type\":\"done\"}\n\n"
+
+        except Exception as e:
+            logger.exception(f"Article summary failed: {e}")
+            error_message = str(e)
+            if "Tavily" in error_message:
+                error_message = "Web search limit reached."
+            yield f"data: {json.dumps({'type': 'error', 'message': error_message})}\n\n"
+            yield "data: {\"type\":\"done\"}\n\n"
+
 search_orchestrator = SearchOrchestrator()

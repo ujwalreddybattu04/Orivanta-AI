@@ -3185,3 +3185,45 @@ input:focus-visible {
         color: #222 !important;
     }
 }
+/* ── Discover "Follow up to:" context card ── */
+.sp-from-article-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.sp-from-article-icon {
+    color: var(--color-text-tertiary);
+    flex-shrink: 0;
+}
+
+.sp-from-article-label {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+    flex-shrink: 0;
+}
+
+.sp-from-article-img {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.sp-from-article-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text-primary);
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
